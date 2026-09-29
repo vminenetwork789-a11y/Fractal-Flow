@@ -5201,6 +5201,54 @@ export class MatrixSimulator {
     return created;
   }
 
+  // ดึงยอดรวมรายได้ Direct Bonus และ Level Bonus สะสมจากทุกผัง (Rank 1 ถึง 45) ของรหัสในตระกูล (ไม่นับซ้ำ)
+  getFamilyEarningsSummary(nodeId: number): { totalDirectEarned: number; totalLevelEarned: number } {
+    const node = this.nodes.get(nodeId);
+    if (!node) return { totalDirectEarned: 0, totalLevelEarned: 0 };
+    const mainId = (node.isRebirth && node.originalAncestorId)
+      ? node.originalAncestorId
+      : (node.isRebirth && node.rebornFromNodeId)
+      ? node.rebornFromNodeId
+      : node.id;
+
+    // เก็บรวบรวม ID ในตระกูลเดียวกัน (Main ID + Rebirth IDs ทั้งหมดที่เกิดจาก Main ID)
+    const familyNodeIds = new Set<number>([mainId]);
+    for (const n of this.nodes.values()) {
+      if (
+        n.id !== mainId &&
+        n.isRebirth &&
+        (n.originalAncestorId === mainId || n.rebornFromNodeId === mainId)
+      ) {
+        familyNodeIds.add(n.id);
+      }
+    }
+
+    let totalDirect = 0;
+    let totalLevel = 0;
+
+    // รวมรายได้จากผังที่ 1 ถึง 45 จาก rankQueues โดยตรง (ป้องกันการนับซ้ำกับ this.nodes)
+    for (let r = 1; r <= MAX_RANK; r++) {
+      const q = this.rankQueues.get(r);
+      if (q) {
+        for (const qItem of q) {
+          // ค่าแนะนำตรง (Direct Sponsor) รวมยอดของตระกูล (ID หลัก + รหัสโคลนนิ่ง)
+          if (familyNodeIds.has(qItem.nodeId)) {
+            totalDirect += (qItem.totalDirectEarned || 0);
+          }
+          // Level Bonus คิดเฉพาะของรหัส ID นี้ตามลำดับชั้นของสายงาน
+          if (qItem.nodeId === nodeId) {
+            totalLevel += (qItem.totalLevelEarned || 0);
+          }
+        }
+      }
+    }
+
+    return {
+      totalDirectEarned: Math.round(totalDirect * 100) / 100,
+      totalLevelEarned: Math.round(totalLevel * 100) / 100,
+    };
+  }
+
   // 11. Financial Audit Reconciler (ตรวจสอบสมดุลบัญชี 100%)
   getFinancialAudit() {
     const allNodes = this.getAllNodes();

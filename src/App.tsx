@@ -737,6 +737,7 @@ export default function App() {
               getFamilyExcessVaultRank6To45Summary={(nodeId) => simulator.getFamilyExcessVaultRank6To45Summary(nodeId)}
               onExecuteExcessVaultIDCreation={handleExecuteCreateIDFromExcessVault}
               getTotalFamilyAllUpgradeVault={(nodeId) => simulator.getTotalFamilyAllUpgradeVault(nodeId)}
+              getFamilyEarningsSummary={(nodeId) => simulator.getFamilyEarningsSummary(nodeId)}
               onRelocateNode={handleRelocateNode}
               logs={logs}
               onBatchExecuteRebirths={handleBatchExecuteRebirths}

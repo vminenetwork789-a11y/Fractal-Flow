@@ -76,6 +76,7 @@ interface TreeVisualizerProps {
   };
   onExecuteExcessVaultIDCreation?: (mainId: number) => number[];
   getTotalFamilyAllUpgradeVault?: (nodeId: number) => number;
+  getFamilyEarningsSummary?: (nodeId: number) => { totalDirectEarned: number; totalLevelEarned: number };
   onRelocateNode?: (nodeId: number, targetParentId: number, isLeft: boolean) => void;
   logs?: ActivityLog[];
   onBatchExecuteRebirths?: () => void;
@@ -117,6 +118,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   getFamilyExcessVaultRank6To45Summary,
   onExecuteExcessVaultIDCreation,
   getTotalFamilyAllUpgradeVault,
+  getFamilyEarningsSummary,
   onRelocateNode,
   logs = [],
   onBatchExecuteRebirths,
@@ -2411,15 +2413,25 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                     const nRootId = (n.isRebirth && n.originalAncestorId && n.originalAncestorId > 0) ? n.originalAncestorId : n.id;
                     return nRootId === rootId;
                   });
-                  const idFamilyVault = getTotalFamilyAllUpgradeVault
-                    ? getTotalFamilyAllUpgradeVault(rootId)
+                  const idFamilyVault = getNodeFamilyUpgradeVault
+                    ? getNodeFamilyUpgradeVault(rootId, selectedRank)
                     : sameIdNodes.reduce((sum, n) => sum + (n.upgradeVault || 0), 0);
                   const rebirthCount = nodes.filter((n) => n.id !== rootId && n.isRebirth && (n.originalAncestorId === rootId || n.rebornFromNodeId === rootId)).length;
 
                   // Sum up all earnings of this specific owner address across ALL ranks
-                  const ownerNodes = nodes.filter((n) => n.owner.toLowerCase() === selectedNode.owner.toLowerCase());
-                  const allRanksDirectEarned = ownerNodes.reduce((sum, n) => sum + (n.totalDirectEarned || 0), 0);
-                  const allRanksLevelEarned = ownerNodes.reduce((sum, n) => sum + (n.totalLevelEarned || 0), 0);
+                  const earnings = getFamilyEarningsSummary
+                    ? getFamilyEarningsSummary(selectedNode.id)
+                    : { totalDirectEarned: 0, totalLevelEarned: 0 };
+                  const allRanksDirectEarned = earnings.totalDirectEarned;
+                  const allRanksLevelEarned = earnings.totalLevelEarned;
+
+                  const summary1to5 = getFamilyExcessRebirthVaultSummary
+                    ? getFamilyExcessRebirthVaultSummary(rootId)
+                    : { excessVault: 0, newMainIdCountPossible: 0, systemTotal: 0 };
+
+                  const summary6to45 = getFamilyExcessVaultRank6To45Summary
+                    ? getFamilyExcessVaultRank6To45Summary(rootId)
+                    : { excessVault: 0, canCreateNewID: false, systemTotal: 0 };
 
                   return (
                     <div className="p-3 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950/40 border border-indigo-500/20 space-y-2.5 shadow-md">
@@ -2439,6 +2451,53 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                         <span className="font-mono font-bold text-indigo-300">
                           +{allRanksLevelEarned.toFixed(2)} USDT
                         </span>
+                      </div>
+
+                      {/* Divider and new metrics requested by user */}
+                      <div className="border-t border-indigo-500/15 pt-2 space-y-2">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-400 flex items-center gap-1.5">
+                            <Shield className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span>40% Vault เม็ดซ้าย (ย้อนหลัง 5 ผัง):</span>
+                          </span>
+                          <span className="font-mono font-bold text-amber-400 text-right">
+                            {idFamilyVault.toFixed(2)} USDT
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-400 flex items-center gap-1.5">
+                            <Coins className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <span>ยอดส่วนเกินไอดี #{rootId} (ผัง 1-5):</span>
+                          </span>
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <span className="font-mono font-bold text-indigo-300">
+                              {summary1to5.excessVault.toFixed(2)} / 5.00 U
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold shrink-0">
+                              เปิดได้: {summary1to5.newMainIdCountPossible ?? 0} ไอดี
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-400 flex items-center gap-1.5">
+                            <Zap className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span>ยอดส่วนเกินไอดี #{rootId} (ผัง 6-45):</span>
+                          </span>
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <span className="font-mono font-bold text-emerald-300">
+                              {summary6to45.excessVault.toFixed(2)} USDT
+                            </span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0 ${
+                              summary6to45.canCreateNewID 
+                                ? 'bg-emerald-500/20 text-emerald-300' 
+                                : 'bg-slate-800 text-slate-500'
+                            }`}>
+                              {summary6to45.canCreateNewID ? 'พร้อมเปิดรหัส' : 'รอสะสม'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );

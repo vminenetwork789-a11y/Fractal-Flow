@@ -21,8 +21,12 @@ async function startServer() {
     res.status(200).send("OK");
   });
 
-  // Resolve dist path depending on where server is run (dev at root or prod at dist)
-  const distPath = fs.existsSync(path.join(__dirname, "dist"))
+  // Resolve dist or build path depending on where server is run
+  const distPath = fs.existsSync(path.join(__dirname, "dist", "index.html"))
+    ? path.join(__dirname, "dist")
+    : fs.existsSync(path.join(__dirname, "build", "index.html"))
+    ? path.join(__dirname, "build")
+    : fs.existsSync(path.join(__dirname, "dist"))
     ? path.join(__dirname, "dist")
     : __dirname;
   const indexHtmlInDist = path.join(distPath, "index.html");
