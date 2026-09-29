@@ -1,0 +1,8 @@
+{
+  "name": "Remix Regen Flow",
+  "description": "Smart Contract and Web3 frontend for 1-to-2 Binary Network with 1-wallet multiple IDs, Rank 1-45 progression (+5 USDT per rank, auto-upgrade via Upgrade Vault, exclusive to main ID), Admin Console, 100% left-child distribution, right-child rebirth pool, and gas-optimized batch keeper.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

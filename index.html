@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="th" class="notranslate" translate="no" style="background-color: #020617; color: #f8fafc; overflow-x: hidden; width: 100%; max-width: 100%;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="google" content="notranslate" />
+    <meta name="googlebot" content="notranslate" />
+    <script>
+      // 1. Monkey-patch Node DOM methods to prevent crashes when Google Translate or extensions alter DOM text nodes
+      if (typeof Node === 'function' && Node.prototype) {
+        var origInsertBefore = Node.prototype.insertBefore;
+        Node.prototype.insertBefore = function(newNode, referenceNode) {
+          if (referenceNode && referenceNode.parentNode !== this) {
+            if (referenceNode.parentNode) {
+              return referenceNode.parentNode.insertBefore(newNode, referenceNode);
+            }
+            return this.appendChild(newNode);
+          }
+          return origInsertBefore.apply(this, arguments);
+        };
+
+        var origRemoveChild = Node.prototype.removeChild;
+        Node.prototype.removeChild = function(child) {
+          if (child && child.parentNode !== this) {
+            if (child.parentNode) {
+              return child.parentNode.removeChild(child);
+            }
+            return child;
+          }
+          return origRemoveChild.apply(this, arguments);
+        };
+
+        var origReplaceChild = Node.prototype.replaceChild;
+        Node.prototype.replaceChild = function(newChild, oldChild) {
+          if (oldChild && oldChild.parentNode !== this) {
+            if (oldChild.parentNode) {
+              return oldChild.parentNode.replaceChild(newChild, oldChild);
+            }
+            return this.appendChild(newChild);
+          }
+          return origReplaceChild.apply(this, arguments);
+        };
+      }
+
+      // 2. Gracefully handle cross-origin iframe security restrictions
+      // (e.g. browser extensions or Web3 wallet inpage scripts checking window.top.location.origin)
+      window.addEventListener('error', function(event) {
+        if (!event) return;
+        var msg = (event.message || (event.error && event.error.message) || '').toString();
+        if (
+          msg.indexOf('Blocked a frame with origin') !== -1 ||
+          msg.indexOf("Failed to read a named property 'origin'") !== -1 ||
+          msg.indexOf('cross-origin') !== -1 ||
+          msg.indexOf('insertBefore') !== -1 ||
+          msg.indexOf('removeChild') !== -1 ||
+          msg.indexOf('not a child of this node') !== -1 ||
+          msg.indexOf('ไม่ใช่โหนดลูก') !== -1 ||
+          msg === 'Script error.'
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return true;
+        }
+      }, true);
+
+      window.addEventListener('unhandledrejection', function(event) {
+        if (!event) return;
+        var reason = (event.reason && (event.reason.message || event.reason.toString())) || '';
+        if (
+          reason.indexOf('Blocked a frame with origin') !== -1 ||
+          reason.indexOf("Failed to read a named property 'origin'") !== -1 ||
+          reason.indexOf('cross-origin') !== -1 ||
+          reason.indexOf('insertBefore') !== -1 ||
+          reason.indexOf('removeChild') !== -1 ||
+          reason.indexOf('not a child of this node') !== -1 ||
+          reason.indexOf('ไม่ใช่โหนดลูก') !== -1
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      }, true);
+
+      var prevOnError = window.onerror;
+      window.onerror = function(message, source, lineno, colno, error) {
+        var strMsg = String(message || '');
+        if (
+          strMsg.indexOf('Blocked a frame with origin') !== -1 ||
+          strMsg.indexOf("Failed to read a named property 'origin'") !== -1 ||
+          strMsg.indexOf('cross-origin') !== -1 ||
+          strMsg.indexOf('insertBefore') !== -1 ||
+          strMsg.indexOf('removeChild') !== -1 ||
+          strMsg.indexOf('not a child of this node') !== -1 ||
+          strMsg.indexOf('ไม่ใช่โหนดลูก') !== -1 ||
+          strMsg === 'Script error.'
+        ) {
+          return true;
+        }
+        if (typeof prevOnError === 'function') {
+          return prevOnError.apply(this, arguments);
+        }
+        return false;
+      };
+    </script>
+    <title>Regen Flow</title>
+    <meta name="description" content="Smart Contract and Web3 frontend for 1-to-2 Binary Network with 1-wallet multiple IDs, Rank 1-45 progression (+5 USDT per rank, auto-upgrade via Upgrade Vault, exclusive to main ID), Admin Console, 100% left-child distribution, right-child rebirth pool, and gas-optimized batch keeper." />
+    <meta property="og:title" content="Regen Flow" />
+    <meta property="og:description" content="Smart Contract and Web3 frontend for 1-to-2 Binary Network with 1-wallet multiple IDs, Rank 1-45 progression (+5 USDT per rank, auto-upgrade via Upgrade Vault, exclusive to main ID), Admin Console, 100% left-child distribution, right-child rebirth pool, and gas-optimized batch keeper." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body style="background-color: #020617; color: #f8fafc; overflow-x: hidden; width: 100%; max-width: 100%; margin: 0; padding: 0; min-height: 100vh; min-height: 100dvh;">
+    <div id="root" style="background-color: #020617; width: 100%; max-width: 100%; overflow-x: hidden; min-height: 100vh; min-height: 100dvh;"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
