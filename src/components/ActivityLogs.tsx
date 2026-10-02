@@ -11,7 +11,7 @@ interface ActivityLogsProps {
 
 export const ActivityLogs: React.FC<ActivityLogsProps> = ({ logs, nodes = [] }) => {
   const { t } = useLanguage();
-  const [filterType, setFilterType] = useState<'ALL' | 'VAULT' | 'DIRECT' | 'LEVEL' | 'REBIRTH'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'VAULT' | 'DIRECT' | 'LEVEL' | 'REBIRTH' | 'POOL'>('ALL');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   const filteredLogs = useMemo(() => {
@@ -20,6 +20,7 @@ export const ActivityLogs: React.FC<ActivityLogsProps> = ({ logs, nodes = [] }) 
       if (filterType === 'DIRECT') return log.type === 'PAYOUT_LEFT' || log.type === 'DIRECT_BONUS';
       if (filterType === 'LEVEL') return log.type === 'PAYOUT_LEFT' || log.type === 'LEVEL_BONUS';
       if (filterType === 'REBIRTH') return log.type === 'REBIRTH_TRIGGER' || log.type === 'REBIRTH_EXECUTED' || log.type === 'BATCH_REBIRTH';
+      if (filterType === 'POOL') return log.type === 'REBIRTH_TRIGGER' || log.type === 'REBIRTH_EXECUTED' || (log.description && (log.description.includes('กองกลาง') || log.description.includes('Rebirth Pool') || log.description.includes('ส่วนเกิน')));
       return true;
     });
   }, [logs, filterType]);
@@ -158,6 +159,16 @@ export const ActivityLogs: React.FC<ActivityLogsProps> = ({ logs, nodes = [] }) 
           }`}
         >
           <span>♻️ Rebirth</span>
+        </button>
+        <button
+          onClick={() => setFilterType('POOL')}
+          className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
+            filterType === 'POOL'
+              ? 'bg-amber-600 text-white shadow-sm'
+              : 'bg-slate-800/80 text-amber-300 hover:bg-amber-950/40'
+          }`}
+        >
+          <span>📜 กองกลาง</span>
         </button>
       </div>
 

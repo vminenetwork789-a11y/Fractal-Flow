@@ -33,6 +33,7 @@ interface FifteenLevelExplorerProps {
   onSelectNode: (id: number) => void;
   onQuickRegisterUnder: (parentId: number, isLeft: boolean) => void;
   rankPrice?: number;
+  chart1Nodes?: MatrixNode[];
 }
 
 export interface DownlineNodeItem {
@@ -59,6 +60,7 @@ export const FifteenLevelExplorer: React.FC<FifteenLevelExplorerProps> = ({
   onSelectNode,
   onQuickRegisterUnder,
   rankPrice = 5.0,
+  chart1Nodes = [],
 }) => {
   const { t } = useLanguage();
   const currentRank = nodes[0]?.rank || 1;
@@ -550,10 +552,32 @@ export const FifteenLevelExplorer: React.FC<FifteenLevelExplorerProps> = ({
                                   <span className="font-medium truncate">{getWalletName(node.owner)}</span>
                                 </div>
                                 <div className="text-[11px] text-slate-400 flex items-center justify-between">
-                                  <span>ต่อใต้รหัสพ่อ:</span>
-                                  <span className="font-mono text-indigo-300 font-semibold">
-                                    #{node.parentId} ({isLeft ? 'ขาซ้าย' : 'ขาขวา'})
-                                  </span>
+                                  <span>ต่อใต้รหัสพ่อ (Parent):</span>
+                                  {(() => {
+                                    const chart1Node = currentRank >= 2 && chart1Nodes ? chart1Nodes.find((n) => n.id === node.id) : undefined;
+                                    const displayParentId = currentRank >= 2
+                                      ? (chart1Node ? chart1Node.parentId : 0)
+                                      : node.parentId;
+                                    return (
+                                      <span className="font-mono text-indigo-300 font-semibold">
+                                        #{displayParentId} {currentRank >= 2 ? '(ผัง 1)' : `(${isLeft ? 'ขาซ้าย' : 'ขาขวา'})`}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                                <div className="text-[11px] text-slate-400 flex items-center justify-between">
+                                  <span>Direct Upline:</span>
+                                  {(() => {
+                                    const chart1Node = chart1Nodes ? chart1Nodes.find((n) => n.id === node.id) : undefined;
+                                    const displaySponsorId = currentRank >= 2
+                                      ? (chart1Node ? chart1Node.sponsorNodeId : 1)
+                                      : (node.sponsorNodeId || 1);
+                                    return (
+                                      <span className="font-mono text-indigo-300 font-semibold">
+                                        #{displaySponsorId} {currentRank >= 2 ? '(ผัง 1)' : ''}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                                 <div className="text-[10px] text-slate-500 truncate font-mono">
                                   เส้นทาง: {path}

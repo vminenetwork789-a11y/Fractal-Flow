@@ -16,9 +16,12 @@ import {
   RefreshCw,
   Crown,
   Coins,
+  History,
 } from 'lucide-react';
 import { REGISTRATION_FEE } from '../lib/matrixSimulator';
 import { useLanguage } from '../i18n/LanguageContext';
+import { CentralPoolTransaction } from '../types';
+import { CentralPoolHistoryView } from './CentralPoolHistoryView';
 
 interface RebirthManagerProps {
   nodes: MatrixNode[];
@@ -46,6 +49,7 @@ interface RebirthManagerProps {
   };
   onExecuteExcessVaultIDCreation?: (mainId: number) => void;
   onAddTestVaultToRank6To45?: (mainId: number, targetRank?: number, amount?: number) => void;
+  centralPoolHistory?: CentralPoolTransaction[];
 }
 
 export const RebirthManager: React.FC<RebirthManagerProps> = ({
@@ -66,6 +70,7 @@ export const RebirthManager: React.FC<RebirthManagerProps> = ({
   getFamilyExcessVaultRank6To45Summary,
   onExecuteExcessVaultIDCreation,
   onAddTestVaultToRank6To45,
+  centralPoolHistory = [],
 }) => {
   const { t } = useLanguage();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -74,7 +79,7 @@ export const RebirthManager: React.FC<RebirthManagerProps> = ({
   const [idSearch, setIdSearch] = useState<string>('');
   const [selectedMainIdForRank1To5, setSelectedMainIdForRank1To5] = useState<number>(1);
   const [selectedMainIdForRank6To45, setSelectedMainIdForRank6To45] = useState<number>(1);
-  const [centralPoolTab, setCentralPoolTab] = useState<'all' | 'pool1' | 'pool2' | 'pool3'>('all');
+  const [centralPoolTab, setCentralPoolTab] = useState<'all' | 'pool1' | 'pool2' | 'pool3' | 'history'>('all');
 
   const pendingNodes = nodes.filter((n) => n.pendingRebirths > 0);
   const rebornNodes = nodes.filter((n) => n.isRebirth);
@@ -364,9 +369,52 @@ export const RebirthManager: React.FC<RebirthManagerProps> = ({
             >
               <span>🟢 กอง 3 (ผัง 6-45 ➔ New Member)</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setCentralPoolTab('history')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
+                centralPoolTab === 'history'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-900/40'
+                  : 'text-amber-300 hover:bg-amber-950/40'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>📜 ประวัตกองกลาง ({centralPoolHistory.length})</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* [ประวัตกองกลาง]: Central Pools Audit Ledger */}
+      {centralPoolTab === 'history' && (
+        <div className="bg-slate-900/95 border-2 border-amber-500/40 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center shadow-md">
+                <History className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>📜 ประวัตกองกลาง (Central Pools Audit History)</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+                    ความโปร่งใส 100%
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  ประวัติการรับเงินเข้าจาก 30% Direct Upline และ 30% Level Bonus เข้าสู่กองกลาง
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <CentralPoolHistoryView
+            history={centralPoolHistory}
+            rebirthPoolBalance={rebirthPool}
+            selectedNodeId={selectedMainIdForRank1To5}
+            onSelectNodeId={(id) => setSelectedMainIdForRank1To5(id)}
+          />
+        </div>
+      )}
 
       {/* [กองที่ 1]: Rebirth Pool สำหรับโคลนนิ่ง */}
       {(centralPoolTab === 'all' || centralPoolTab === 'pool1') && (
@@ -1033,8 +1081,10 @@ export const RebirthManager: React.FC<RebirthManagerProps> = ({
               const suggestedSlot = findRebirthSlot(node.id);
               const mainId = node.originalAncestorId || node.id;
               const ancestorNode = nodes.find((n) => n.id === mainId);
-              const directUplineId = node.sponsorNodeId || ancestorNode?.sponsorNodeId || 1;
-              const isDirectUplineNot1 = directUplineId !== 1;
+              const directUplineId = node.id === 1 || mainId === 1
+                ? 0
+                : (node.sponsorNodeId !== undefined ? node.sponsorNodeId : (ancestorNode?.sponsorNodeId || 1));
+              const isDirectUplineNot1 = directUplineId !== 1 && directUplineId !== 0;
               const isNotId1 = node.id !== 1 && mainId !== 1;
               const existingRebirthIds = getRebirthNodeIds(mainId, nodes);
               const totalRebirthsDone = existingRebirthIds.length;
@@ -1119,12 +1169,16 @@ export const RebirthManager: React.FC<RebirthManagerProps> = ({
                         <span className="text-slate-400">Direct Upline:</span>
                         <span
                           className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded ${
-                            isDirectUplineNot1
+                            directUplineId === 0 || node.id === 1 || mainId === 1
+                              ? 'bg-amber-950/70 text-amber-300 border border-amber-800/80'
+                              : isDirectUplineNot1
                               ? 'bg-amber-950/70 text-amber-300 border border-amber-800/80'
                               : 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/80'
                           }`}
                         >
-                          #{directUplineId} {isDirectUplineNot1 ? '(ไม่ใช่ ID #1)' : '(ID #1)'}
+                          {directUplineId === 0 || node.id === 1 || mainId === 1
+                            ? '0 = กองกลาง'
+                            : `#${directUplineId} ${isDirectUplineNot1 ? '(ไม่ใช่ ID #1)' : '(ID #1)'}`}
                         </span>
                         <span className="text-[10px] text-purple-300/90">
                           (เกิดสะสม: {node.rebirthCount} รอบ)

@@ -1799,6 +1799,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
               onSelectNode={onSelectNode}
               onQuickRegisterUnder={onQuickRegisterUnder}
               rankPrice={currentRankInfo.price}
+              chart1Nodes={nodes}
             />
           )}
 
@@ -2286,38 +2287,86 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                   )}
                   <div className="flex justify-between">
                     <span className="text-slate-400">อัพไลน์ (Parent):</span>
-                    <button
-                      onClick={() => selectedNode.parentId > 0 && onSelectNode(selectedNode.parentId)}
-                      className={`font-mono font-bold ${
-                        selectedNode.parentId > 0
-                          ? 'text-indigo-400 hover:underline'
-                          : 'text-slate-500 cursor-default'
-                      }`}
-                    >
-                      {selectedNode.parentId > 0 ? `#${selectedNode.parentId}` : 'ไม่มี (Root Node)'}
-                    </button>
+                    {selectedNode.id === 1 ? (
+                      <span className="font-semibold text-slate-500 text-xs">
+                        ไม่มีผู้เเนะนำ
+                      </span>
+                    ) : selectedRank >= 2 ? (
+                      (() => {
+                        const chart1Node = nodes.find((n) => n.id === selectedNode.id);
+                        const c1ParentId = chart1Node ? chart1Node.parentId : 0;
+                        return (
+                          <button
+                            onClick={() => {
+                              if (c1ParentId > 0) {
+                                onSelectNode(c1ParentId);
+                              }
+                            }}
+                            disabled={c1ParentId <= 0}
+                            className={`font-mono font-bold ${
+                              c1ParentId > 0
+                                ? 'text-indigo-400 hover:underline'
+                                : 'text-slate-500 cursor-default'
+                            }`}
+                          >
+                            {c1ParentId > 0 ? `#${c1ParentId}` : 'ไม่มี (Root Node)'}
+                            <span className="text-[10px] text-amber-300 font-normal ml-1 bg-amber-950/60 border border-amber-800/60 px-1.5 py-0.2 rounded font-sans">
+                              (อ้างอิงจากผัง 1)
+                            </span>
+                          </button>
+                        );
+                      })()
+                    ) : (
+                      <button
+                        onClick={() => selectedNode.parentId > 0 && onSelectNode(selectedNode.parentId)}
+                        className={`font-mono font-bold ${
+                          selectedNode.parentId > 0
+                            ? 'text-indigo-400 hover:underline'
+                            : 'text-slate-500 cursor-default'
+                        }`}
+                      >
+                        {selectedNode.parentId > 0 ? `#${selectedNode.parentId}` : 'ไม่มี (Root Node)'}
+                      </button>
+                    )}
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400">Direct Upline:</span>
                     {selectedNode.id === 1 ? (
-                      <span className="font-mono font-bold text-indigo-400 text-xs">
-                        #1
+                      <span className="font-mono font-bold text-amber-400 text-xs">
+                        #0
                       </span>
                     ) : (
-                      <button
-                        onClick={() => {
-                          const sId = selectedNode.sponsorNodeId || 1;
-                          if (sId > 0) onSelectNode(sId);
-                        }}
-                        className="font-mono font-bold text-indigo-400 hover:underline text-xs flex items-center space-x-1"
-                      >
-                        <span>#{selectedNode.sponsorNodeId || 1}</span>
-                        {selectedNode.isRebirth && (
-                          <span className="text-[10px] text-amber-300 font-normal ml-1 bg-amber-950/60 border border-amber-800/60 px-1.5 py-0.2 rounded">
-                            (ดึงจาก ID หลัก)
-                          </span>
-                        )}
-                      </button>
+                      (() => {
+                        const chart1Node = selectedRank >= 2 ? nodes.find((n) => n.id === selectedNode.id) : undefined;
+                        const displaySponsorId = selectedRank >= 2
+                          ? (chart1Node ? chart1Node.sponsorNodeId : 1)
+                          : (selectedNode.sponsorNodeId || 1);
+                        return (
+                          <button
+                            onClick={() => {
+                              if (displaySponsorId > 0) {
+                                onSelectNode(displaySponsorId);
+                              }
+                            }}
+                            className="font-mono font-bold text-indigo-400 hover:underline text-xs flex items-center space-x-1"
+                          >
+                            <span>#{displaySponsorId}</span>
+                            {selectedRank >= 2 ? (
+                              <span className="text-[10px] text-amber-300 font-normal ml-1 bg-amber-950/60 border border-amber-800/60 px-1.5 py-0.2 rounded font-sans">
+                                (อ้างอิงจากผัง 1)
+                              </span>
+                            ) : (selectedNode.isRebirth && (selectedNode.originalAncestorId === 1 || selectedNode.rebornFromNodeId === 1)) ? (
+                              <span className="text-[10px] text-amber-300 font-normal ml-1 bg-amber-950/60 border border-amber-800/60 px-1.5 py-0.2 rounded">
+                                (โคลนนิ่ง #1: 30% ส่งกลับ #1)
+                              </span>
+                            ) : selectedNode.isRebirth ? (
+                              <span className="text-[10px] text-amber-300 font-normal ml-1 bg-amber-950/60 border border-amber-800/60 px-1.5 py-0.2 rounded">
+                                (ดึงจาก ID หลัก)
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })()
                     )}
                   </div>
                   <div className="flex justify-between">
@@ -2452,6 +2501,11 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                           +{allRanksLevelEarned.toFixed(2)} USDT
                         </span>
                       </div>
+                      {rebirthCount > 0 && (
+                        <div className="text-[10px] text-indigo-300/90 font-medium text-center pt-0.5 pb-0.5">
+                          (ยอดสะสมรวมทั้งตระกูล: ID หลัก #{rootId} + โคลนนิ่ง {rebirthCount} รหัส)
+                        </div>
+                      )}
 
                       {/* Divider and new metrics requested by user */}
                       <div className="border-t border-indigo-500/15 pt-2 space-y-2">

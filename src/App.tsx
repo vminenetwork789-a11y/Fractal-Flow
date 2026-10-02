@@ -11,6 +11,7 @@ import { ActivityLogs } from './components/ActivityLogs';
 import { AdminPanel } from './components/AdminPanel';
 import { IdSwitcher } from './components/IdSwitcher';
 import { CentralPoolsDashboard } from './components/CentralPoolsDashboard';
+import { CentralPoolHistoryModal } from './components/CentralPoolHistoryModal';
 import { useLanguage } from './i18n/LanguageContext';
 import { ethers } from 'ethers';
 import {
@@ -29,6 +30,7 @@ import {
   Users,
   UserPlus,
   RefreshCw,
+  History,
 } from 'lucide-react';
 
 export default function App() {
@@ -39,7 +41,7 @@ export default function App() {
   const [nodes, setNodes] = useState<MatrixNode[]>([]);
   const [wallets, setWallets] = useState<WalletAccount[]>([]);
   const [selectedWalletAddress, setSelectedWalletAddress] = useState<string>('0x2222222222222222222222222222222222222222');
-  const [selectedNodeId, setSelectedNodeId] = useState<number>(1);
+  const [selectedNodeId, setSelectedNodeId] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<'app' | 'contract' | 'math' | 'keeper' | 'admin'>('app');
   const [quickTarget, setQuickTarget] = useState<{ parentId: number; isLeft: boolean } | null>(null);
   const [isPaused, setIsPaused] = useState<boolean>(false);
@@ -58,6 +60,7 @@ export default function App() {
   const [isWeb3Connected, setIsWeb3Connected] = useState<boolean>(false);
   const [web3Address, setWeb3Address] = useState<string | null>(null);
   const [web3StatusMsg, setWeb3StatusMsg] = useState<string | null>(null);
+  const [isCentralPoolHistoryModalOpen, setIsCentralPoolHistoryModalOpen] = useState<boolean>(false);
 
   const isInIframe = useMemo(() => {
     try {
@@ -89,6 +92,24 @@ export default function App() {
         console.warn('Auto relocate #8 -> #7:', e);
       }
     }
+
+    // Auto fix if node 13 is under node 12 and node 11 right child is free (created by id1)
+    const n13 = simulator.nodes.get(13);
+    const n11 = simulator.nodes.get(11);
+    const n12 = simulator.nodes.get(12);
+    const n14 = simulator.nodes.get(14);
+    if (n13 && n13.parentId === 12 && n11 && n11.rightChild === 0) {
+      try {
+        simulator.relocateNode(13, 11, false);
+        if (n14 && n14.parentId === 12 && n12 && n12.leftChild === 0) {
+          simulator.relocateNode(14, 12, true);
+        }
+      } catch (e) {
+        console.warn('Auto relocate #13 -> #11:', e);
+      }
+    }
+    // Reconcile 30% Direct Upline bonus for clones of #0 (must go to #0, not parent)
+    simulator.reconcileCloneOf0DirectBonuses();
     refreshSimulatorState();
     const unsubscribe = simulator.onNotification(() => {
       setNotifications([...simulator.getNotifications()]);
@@ -103,6 +124,8 @@ export default function App() {
       setAutoCurrentRound(currentRound || 0);
       setAutoTotalRounds(totalRounds || 0);
     });
+    // Start scheduling auto actions now that all state & countdown listeners are bound
+    simulator.scheduleAutoActions();
     return () => {
       unsubscribe();
       unsubState();
@@ -412,7 +435,7 @@ export default function App() {
       simulator.emitNotification({
         type: 'REGISTRATION',
         title: '🎉 มีการสมัครสมาชิกใหม่ (ทดสอบ)',
-        message: `รหัส #${nodes.length + 1 || 99} (${currentWallet.name}) สมัครสมาชิกต่อใต้ #${selectedNodeId || 1} ฝั่งซ้าย [5.00 USDT]`,
+        message: `รหัส #${nodes.length + 1 || 99} (${currentWallet.name}) สมัครสมาชิกต่อใต้ #${selectedNodeId !== undefined ? selectedNodeId : 0} ฝั่งซ้าย [5.00 USDT]`,
         nodeId: nodes.length + 1 || 99,
         rank: 1,
         amount: 5.0,
@@ -423,7 +446,7 @@ export default function App() {
       simulator.emitNotification({
         type: 'REBIRTH',
         title: '🌱 รหัสเกิดใหม่ทำงานสำเร็จ (ทดสอบ)',
-        message: `รหัสเกิดใหม่ #${nodes.length + 1 || 99} คลอดจากไอดีหลัก #${selectedNodeId || 1} สู่ผังต้นไม้ [5.00 USDT]`,
+        message: `รหัสเกิดใหม่ #${nodes.length + 1 || 99} คลอดจากไอดีหลัก #${selectedNodeId !== undefined ? selectedNodeId : 0} สู่ผังต้นไม้ [5.00 USDT]`,
         nodeId: nodes.length + 1 || 99,
         rank: 1,
         amount: 5.0,
@@ -434,8 +457,8 @@ export default function App() {
       simulator.emitNotification({
         type: 'UPGRADE',
         title: '⭐ เลื่อนขั้นผังสำเร็จ (ทดสอบ)',
-        message: `รหัสหลัก #${selectedNodeId || 1} (${currentWallet.name}) อัพเกรดสู่ ผัง 2 (Bronze Member) [10.00 USDT]`,
-        nodeId: selectedNodeId || 1,
+        message: `รหัสหลัก #${selectedNodeId !== undefined ? selectedNodeId : 0} (${currentWallet.name}) อัพเกรดสู่ ผัง 2 (Bronze Member) [10.00 USDT]`,
+        nodeId: selectedNodeId !== undefined ? selectedNodeId : 0,
         rank: 2,
         amount: 10.0,
         walletName: currentWallet.name,
@@ -651,6 +674,28 @@ export default function App() {
           })()}
         </div>
 
+        {/* Quick Action Strip for Central Pool History */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-3 shadow-md">
+          <div className="flex items-center space-x-2.5 text-xs text-slate-300">
+            <span className="p-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <History className="w-4 h-4" />
+            </span>
+            <div>
+              <span className="font-bold text-slate-100 block sm:inline">สมุดบัญชีกองกลาง (Central Pools Audit History)</span>
+              <span className="text-slate-400 text-[11px] sm:ml-1.5">| บันทึกประวัติเงินเข้า-ออกครบ 3 กองกลางทุกธุรกรรม 100%</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsCentralPoolHistoryModalOpen(true)}
+            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold text-xs flex items-center space-x-1.5 shadow-md shadow-amber-900/40 transition-all cursor-pointer shrink-0 self-end sm:self-auto"
+          >
+            <History className="w-3.5 h-3.5" />
+            <span>📜 เปิดดูประวัตกองกลาง ({simulator.getCentralPoolHistory().length})</span>
+          </button>
+        </div>
+
         {/* Dedicated 3 Central Pools Dashboard */}
         <CentralPoolsDashboard
           simulator={simulator}
@@ -809,6 +854,38 @@ export default function App() {
 
         {activeTab === 'math' && <MathExplainer />}
 
+        {activeTab === 'keeper' && (
+          <RebirthManager
+            nodes={nodes}
+            wallets={wallets}
+            rebirthPool={simulator.rebirthPool}
+            onExecuteRebirth={handleExecuteRebirth}
+            onBatchExecuteRebirths={handleBatchExecuteRebirths}
+            findRebirthSlot={findRebirthSlot}
+            autoRebirth={simulator.autoRebirthEnabled}
+            onToggleAutoRebirth={(enabled) => {
+              simulator.setAutoRebirth(enabled);
+              refreshSimulatorState();
+            }}
+            autoExcessVaultNewMainId={simulator.autoExcessVaultNewMainIdEnabled}
+            onToggleAutoExcessVaultNewMainId={(enabled) => {
+              simulator.setAutoExcessVaultNewMainId(enabled);
+              refreshSimulatorState();
+            }}
+            onFocusNode={(id) => {
+              setSelectedNodeId(id);
+              setActiveTab('app');
+            }}
+            getFamilyExcessRebirthVaultSummary={(nodeId) => simulator.getFamilyExcessRebirthVaultSummary(nodeId)}
+            onExecuteMainIdRebirthFromExcessVault={handleExecuteMainIdRebirthFromExcessVault}
+            onAddTestVaultToRank1To5={handleAddTestVaultToRank1To5}
+            getFamilyExcessVaultRank6To45Summary={(nodeId) => simulator.getFamilyExcessVaultRank6To45Summary(nodeId)}
+            onExecuteExcessVaultIDCreation={handleExecuteCreateIDFromExcessVault}
+            onAddTestVaultToRank6To45={handleAddTestVaultToRank6To45}
+            centralPoolHistory={simulator.getCentralPoolHistory()}
+          />
+        )}
+
         {activeTab === 'admin' && (
           <AdminPanel
             nodes={nodes}
@@ -854,6 +931,18 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Central Pool History Modal */}
+      <CentralPoolHistoryModal
+        isOpen={isCentralPoolHistoryModalOpen}
+        onClose={() => setIsCentralPoolHistoryModalOpen(false)}
+        history={simulator.getCentralPoolHistory()}
+        rebirthPoolBalance={simulator.rebirthPool}
+        totalSystemVaultRank1To5={simulator.getTotalSystemExcessVaultRank1To5()}
+        totalSystemVaultRank6To45={simulator.getTotalSystemExcessVaultRank6To45()}
+        selectedNodeId={selectedNodeId}
+        onSelectNodeId={setSelectedNodeId}
+      />
     </div>
   );
 }

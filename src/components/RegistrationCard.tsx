@@ -1676,7 +1676,7 @@ export const RegistrationCard: React.FC<RegistrationCardProps> = ({
                   💡 แม้ว่าระบบจะจัดวางตำแหน่งในผัง (Spillover) หรือเลือกต่อตรงใต้รหัสแม่อื่น <strong>ผู้แนะนำยังคงเป็นหมายเลขที่กรอกตรงนี้เสมอ</strong>
                 </p>
                 <div className="text-emerald-400/90 font-medium shrink-0 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/50">
-                  📌 Direct Upline ของกระเป๋าที่ 1 ก็คือ ไอดีที่ 1
+                  📌 อัพไลน์ (Parent) และ Direct Upline ของ ID #1 คือ 0 = กองกลาง
                 </div>
               </div>
             </div>

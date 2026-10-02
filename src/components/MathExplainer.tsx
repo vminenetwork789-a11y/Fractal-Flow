@@ -63,11 +63,11 @@ export const MathExplainer: React.FC = () => {
             <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/70 flex items-center justify-between">
               <div>
                 <div className="flex items-center space-x-1.5">
-                  <span className="font-bold text-slate-100">30% เข้ากระเป๋าผู้แนะนำตรง:</span>
+                  <span className="font-bold text-slate-100">30% ค่าแนะนำตรง:</span>
                   <span className="text-emerald-400 font-bold">1.50 USDT</span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  โอนเข้ากระเป๋าผู้แนะนำตรง (Direct Sponsor) ทันทีบนบล็อกเชน
+                  โอนเข้ากระเป๋าผู้แนะนำตรงทันที (หากผู้แนะนำตรงคือ ID 1 ยอดนี้จะโอนเข้ากองกลาง Rebirth Pool 100%)
                 </p>
               </div>
               <span className="font-mono text-sm font-bold text-emerald-300">30%</span>
@@ -81,7 +81,7 @@ export const MathExplainer: React.FC = () => {
                   <span className="text-indigo-400 font-bold">1.50 USDT</span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  เริ่มจ่ายตั้งแต่ชั้นที่ 0 (รหัสแม่) และไล่ขึ้นสายงานรวม 15 ชั้น ชั้นละ 2% (0.10 USDT)
+                  เริ่มจ่ายตั้งแต่ชั้นที่ 0 (รหัสแม่) และไล่ขึ้นสายงานรวม 15 ชั้น ชั้นละ 2% (0.10 USDT) โดยส่วนของชั้น ID 1 จะโอนเข้ากองกลาง Rebirth
                 </p>
               </div>
               <span className="font-mono text-sm font-bold text-indigo-300">15 x 0.10</span>

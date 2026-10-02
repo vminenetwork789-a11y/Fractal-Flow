@@ -1,4 +1,4 @@
-import { MatrixNode, WalletAccount, ActivityLog, SlotTarget, RankInfo, RankQueueNode, RegistrationPaymentSource, AppNotification, NotificationType, RebirthRoundInfo, ExcessRebirthVaultSummary } from '../types';
+import { MatrixNode, WalletAccount, ActivityLog, SlotTarget, RankInfo, RankQueueNode, RegistrationPaymentSource, AppNotification, NotificationType, RebirthRoundInfo, ExcessRebirthVaultSummary, CentralPoolTransaction } from '../types';
 
 export const REGISTRATION_FEE = 5.0;
 export const DIRECT_BONUS = 1.5;   // 30%
@@ -164,6 +164,21 @@ export class MatrixSimulator {
   rankQueues: Map<number, RankQueueNode[]> = new Map();
   rankRebirthPool: Map<number, number> = new Map(); // กองกลาง Rebirth แยกราย Rank 1-45
   nextNodeId: number = 2;
+  nodeDirectEarnedByRank: Map<number, Map<number, number>> = new Map();
+
+  public recordDirectBonus(sponsorNodeId: number, rank: number, amount: number) {
+    if (!this.nodeDirectEarnedByRank.has(sponsorNodeId)) {
+      this.nodeDirectEarnedByRank.set(sponsorNodeId, new Map());
+    }
+    const rankMap = this.nodeDirectEarnedByRank.get(sponsorNodeId)!;
+    const current = rankMap.get(rank) || 0;
+    rankMap.set(rank, Math.round((current + amount) * 100) / 100);
+  }
+
+  public getDirectBonusByRank(sponsorNodeId: number, rank: number): number {
+    const rankMap = this.nodeDirectEarnedByRank.get(sponsorNodeId);
+    return rankMap ? (rankMap.get(rank) || 0) : 0;
+  }
 
   // Helper method to guarantee no ID collision with existing nodes in this.nodes
   public generateNextNodeId(): number {
@@ -175,9 +190,9 @@ export class MatrixSimulator {
     return id;
   }
   rebirthPool: number = 0;
-  treasuryBalance: number = 0;
+  treasuryBalance: number = 5.0;
   isPaused: boolean = false;
-  treasuryAddress: string = INITIAL_WALLETS[0].address.toLowerCase();
+  treasuryAddress: string = '0x0000000000000000000000000000000000000000';
   logs: ActivityLog[] = [];
   notifications: AppNotification[] = [];
   autoRebirthEnabled: boolean = true; // โหมดโคลนนิ่งอัตโนมัติ (Rebirth / Clones)
@@ -193,6 +208,123 @@ export class MatrixSimulator {
   private autoRebirthQueue: { rank: number; nodeId: number; queueNumber?: number }[] = [];
   private isProcessingAutoRebirth: boolean = false;
   private notificationListeners: Set<(notif: AppNotification) => void> = new Set();
+  centralPoolHistory: CentralPoolTransaction[] = [];
+
+  getCentralPoolHistory(): CentralPoolTransaction[] {
+    if (this.centralPoolHistory.length > 0) {
+      return this.centralPoolHistory;
+    }
+    const synthesized: CentralPoolTransaction[] = [];
+    for (const log of this.logs) {
+      if (log.type === 'REBIRTH_TRIGGER') {
+        synthesized.push({
+          id: log.id,
+          timestamp: log.timestamp,
+          poolType: 'POOL_1_REBIRTH',
+          poolTitle: 'กองที่ 1: Rebirth Pool สำหรับโคลนนิ่ง',
+          direction: 'IN',
+          amount: log.amount || REGISTRATION_FEE,
+          rank: log.details?.rank || 1,
+          sourceNodeId: log.nodeId,
+          beneficiaryNodeId: log.parentId,
+          actionType: 'RIGHT_CHILD_INFLOW',
+          description: log.description,
+          txHash: log.txHash || '0xrebirth_inflow',
+        });
+      } else if (log.type === 'REBIRTH_EXECUTED') {
+        synthesized.push({
+          id: log.id,
+          timestamp: log.timestamp,
+          poolType: 'POOL_1_REBIRTH',
+          poolTitle: 'กองที่ 1: Rebirth Pool สำหรับโคลนนิ่ง',
+          direction: 'OUT',
+          amount: log.amount || REGISTRATION_FEE,
+          rank: 1,
+          sourceNodeId: log.nodeId,
+          beneficiaryNodeId: log.nodeId,
+          actionType: 'REBIRTH_SPAWNED',
+          description: log.description,
+          txHash: log.txHash || '0xrebirth_spawned',
+        });
+      } else if (log.type === 'DIRECT_BONUS' && (log.nodeId === 1 || log.nodeId === 0)) {
+        synthesized.push({
+          id: log.id,
+          timestamp: log.timestamp,
+          poolType: 'POOL_1_REBIRTH',
+          poolTitle: 'กองที่ 1: Rebirth Pool สำหรับโคลนนิ่ง',
+          direction: 'IN',
+          amount: log.amount || 1.5,
+          rank: log.details?.rank || 1,
+          sourceNodeId: log.details?.fromNodeId || log.nodeId,
+          beneficiaryNodeId: log.nodeId,
+          actionType: 'DIRECT_BONUS_INFLOW',
+          description: log.description,
+          txHash: log.txHash || '0xdirect_bonus_inflow',
+        });
+      } else if (log.type === 'LEVEL_BONUS' && (log.nodeId === 1 || log.nodeId === 0)) {
+        synthesized.push({
+          id: log.id,
+          timestamp: log.timestamp,
+          poolType: 'POOL_1_REBIRTH',
+          poolTitle: 'กองที่ 1: Rebirth Pool สำหรับโคลนนิ่ง',
+          direction: 'IN',
+          amount: log.amount || 0.1,
+          rank: log.details?.rank || 1,
+          sourceNodeId: log.details?.fromNodeId || log.nodeId,
+          beneficiaryNodeId: log.nodeId,
+          actionType: 'LEVEL_BONUS_INFLOW',
+          description: log.description,
+          txHash: log.txHash || '0xlevel_bonus_inflow',
+        });
+      } else if (log.type === 'LEVEL_BONUS' && (log.title.includes('ค่าชั้นส่วนที่เหลือ') || log.title.includes('🏛️'))) {
+        synthesized.push({
+          id: log.id,
+          timestamp: log.timestamp,
+          poolType: 'POOL_1_REBIRTH',
+          poolTitle: 'กองที่ 1: Rebirth Pool สำหรับโคลนนิ่ง',
+          direction: 'IN',
+          amount: log.amount || 0.1,
+          rank: log.details?.rank || 1,
+          sourceNodeId: log.nodeId,
+          beneficiaryNodeId: 1,
+          actionType: 'TREASURY_RESIDUAL_INFLOW',
+          description: log.description,
+          txHash: log.txHash || '0xtreasury_residual_inflow',
+        });
+      } else if (log.type === 'REGISTER' && log.title.includes('New Main ID')) {
+        synthesized.push({
+          id: log.id,
+          timestamp: log.timestamp,
+          poolType: 'POOL_2_EXCESS_VAULT_1_5',
+          poolTitle: 'กองที่ 2: กองกลาง สร้างจากส่วนเกิน 40% Vault (ผัง 1 ถึง 5)',
+          direction: 'OUT',
+          amount: log.amount || REGISTRATION_FEE,
+          rank: 1,
+          sourceNodeId: log.details?.mainId || log.nodeId,
+          beneficiaryNodeId: log.nodeId,
+          actionType: 'NEW_MAIN_ID_CREATED',
+          description: log.description,
+          txHash: log.txHash || '0xnew_main_id_created',
+        });
+      } else if (log.type === 'REGISTER' && log.title.includes('New Member')) {
+        synthesized.push({
+          id: log.id,
+          timestamp: log.timestamp,
+          poolType: 'POOL_3_EXCESS_VAULT_6_45',
+          poolTitle: 'กองที่ 3: กองกลาง สร้างจากส่วนเกิน 40% Vault (ผัง 6 ถึง 45)',
+          direction: 'OUT',
+          amount: log.amount || REGISTRATION_FEE,
+          rank: log.details?.rank || 1,
+          sourceNodeId: log.details?.creatorMainId || log.nodeId,
+          beneficiaryNodeId: log.nodeId,
+          actionType: 'NEW_MEMBER_CREATED',
+          description: log.description,
+          txHash: log.txHash || '0xnew_member_created',
+        });
+      }
+    }
+    return synthesized;
+  }
 
   setAutoExecutionDelay(sec: number) {
     this.autoExecutionDelaySec = Math.max(0, Math.min(60, Number(sec) || 0));
@@ -465,10 +597,12 @@ export class MatrixSimulator {
   }
 
   reset() {
+    this.cancelScheduledAutoActions();
     this.nodes.clear();
     this.wallets.clear();
     this.rankQueues.clear();
     this.rankRebirthPool.clear();
+    this.nodeDirectEarnedByRank.clear();
     for (let r = 1; r <= MAX_RANK; r++) {
       this.rankRebirthPool.set(r, 0);
     }
@@ -477,18 +611,29 @@ export class MatrixSimulator {
     this.nextNodeId = 2;
 
     this.rebirthPool = 0;
-    this.treasuryBalance = 0;
+    this.treasuryBalance = 5.0;
     this.isPaused = false;
     this.autoRebirthEnabled = true;
     this.autoExcessVaultNewMainIdEnabled = true;
     this.autoRebirthQueue = [];
     this.isProcessingAutoRebirth = false;
-    this.treasuryAddress = INITIAL_WALLETS[0].address.toLowerCase();
+    this.treasuryAddress = '0x0000000000000000000000000000000000000000';
 
     // Load Wallets
     for (const w of INITIAL_WALLETS) {
       this.wallets.set(w.address.toLowerCase(), { ...w, balance: 100000000000000, nodeIds: [...w.nodeIds] });
     }
+    // Add id0 wallet
+    this.wallets.set('0x0000000000000000000000000000000000000000', {
+      address: '0x0000000000000000000000000000000000000000',
+      name: 'id0',
+      nodeIds: [],
+      balance: 5.0,
+      totalEarned: 5.0,
+      rebirthCount: 0,
+      pendingRebirths: 0,
+      upgradeVault: 0,
+    });
     const rootWallet = this.wallets.get(INITIAL_WALLETS[0].address.toLowerCase());
     if (rootWallet) rootWallet.firstSponsor = INITIAL_WALLETS[0].address.toLowerCase();
 
@@ -518,7 +663,7 @@ export class MatrixSimulator {
       upgradeVault: 0,
       originalAncestorId: 1,
       firstSponsor: INITIAL_WALLETS[0].address.toLowerCase(),
-      sponsorNodeId: 1, // Direct Upline ของกระเป๋าที่ 1 ก็คือ ไอดีที่ 1
+      sponsorNodeId: 0, // Direct Upline ของกระเป๋าที่ 1 คือ ไอดีที่ 0
       queueNumber: 1,
       createdVia: 'Genesis (ระบบเริ่มต้น)',
     };
@@ -548,11 +693,61 @@ export class MatrixSimulator {
     this.addLog({
       type: 'REGISTER',
       title: 'Genesis Node #1 Deployed',
-      description: 'System root node established under Treasury (Rank 1 Queue #1 Pioneer).',
+      description: 'System root node established under Treasury (Rank 1 Queue #1 Pioneer). Sponsor is ID 0 (กระเป๋ากลาง Treasury).',
       nodeId: 1,
       parentId: 0,
       txHash: '0xgenesis...' + Math.random().toString(16).substring(2, 8),
+      details: {
+        sponsorId: 0,
+      }
     });
+
+    // เพิ่มประวัติรหัส ID 0 (ได้รับค่าธรรมเนียม และโบนัสทั้งหมดของ Genesis Node #1 รวม 5.00 USDT)
+    this.addLog({
+      type: 'DIRECT_BONUS',
+      title: 'Direct Bonus Received: Node #0 (+1.50 USDT)',
+      description: 'ได้รับค่าแนะนำตรง 30% จำนวน 1.50 USDT จากการสถาปนารหัส Genesis Node #1',
+      nodeId: 0,
+      amount: 1.5,
+      txHash: '0xdirect_bonus_genesis_0',
+      details: {
+        rank: 1,
+        fromNodeId: 1,
+        amount: 1.5,
+      }
+    });
+
+    this.addLog({
+      type: 'LEVEL_BONUS',
+      title: 'Level Bonus Received: Node #0 (+1.50 USDT)',
+      description: 'ได้รับโบนัส 15 ชั้นส่วนที่เหลือ (จ่ายไม่ครบ 15 ชั้น) จำนวน 1.50 USDT จากการสถาปนารหัส Genesis Node #1',
+      nodeId: 0,
+      amount: 1.5,
+      txHash: '0xlevel_bonus_genesis_0',
+      details: {
+        rank: 1,
+        fromNodeId: 1,
+        depth: 15,
+        amount: 1.5,
+      }
+    });
+
+    this.addLog({
+      type: 'LEVEL_BONUS',
+      title: '🏛️ ส่วนแบ่ง Upgrade Vault ของ Genesis Node #1 โอนเข้ากระเป๋ากลาง (+2.00 USDT)',
+      description: 'ไม่มีอัพไลน์ชั้นบน (Parent Node #0) ส่วนแบ่ง Upgrade Vault 40% จำนวน 2.00 USDT โอนเข้ากระเป๋ากลาง (Treasury)',
+      nodeId: 0,
+      amount: 2.0,
+      txHash: '0xvault_genesis_residual',
+      details: {
+        rank: 1,
+        fromNodeId: 1,
+        amount: 2.0,
+      }
+    });
+
+    // Start scheduling auto actions upon reset if enabled
+    this.scheduleAutoActions();
   }
 
   topUpAllWallets(amount: number = 100000000000000) {
@@ -904,9 +1099,9 @@ export class MatrixSimulator {
     const node = this.nodes.get(nodeId);
     if (!node) return 1;
 
-    // รหัสกระเป๋าที่ 1 (Root Treasury) -> Direct Upline คือ 1
+    // รหัสกระเป๋าที่ 1 (Root Treasury) -> Direct Upline คือ 0
     if (node.id === 1 || node.owner.toLowerCase() === INITIAL_WALLETS[0].address.toLowerCase()) {
-      return 1;
+      return 0;
     }
 
     // ถ้ามี sponsorNodeId ระบุไว้โดยตรง
@@ -1073,20 +1268,18 @@ export class MatrixSimulator {
 
           // ขั้นที่ 2 (เงื่อนไขสำคัญ): แนะนำโดยไอดี Sponsor ID (แต่ไอดี Sponsor ID เต็มทั้ง 2 ขาแล้ว)
           // ➔ โยนต่อให้รหัสเกิดใหม่ของ Sponsor ID ทันที
-          // ระบบจะสแกนค้นหา "รหัสโคลนนิ่งทั้งหมดของผู้แนะนำ" (Rebirth Nodes ของ Sponsor) จากล่างขึ้นบน
-          let rebirthNodesOfSponsor = Array.from(this.nodes.values())
+          // 2.1 ค้นหารหัสโคลนนิ่งตรงของผู้แนะนำ (Rebirth Nodes ของ Sponsor)
+          const directRebirthNodesOfSponsor = Array.from(this.nodes.values())
             .filter(
               (n) =>
                 n.isRebirth &&
                 n.id !== sponsorNode.id &&
-                (n.rebornFromNodeId === sponsorNode.id ||
-                  n.originalAncestorId === sponsorNode.id ||
-                  n.owner.toLowerCase() === sponsorNode.owner.toLowerCase())
+                (n.rebornFromNodeId === sponsorNode.id || n.originalAncestorId === sponsorNode.id)
             )
-            .sort((a, b) => (b.depth !== a.depth ? b.depth - a.depth : b.id - a.id));
+            .sort((a, b) => (a.depth !== b.depth ? a.depth - b.depth : a.id - b.id));
 
-          // 2.1 ตรวจสอบตำแหน่งติดตัวว่างของรหัสโคลนนิ่งของผู้แนะนำ (เลือกขาซ้ายก่อนขาขวา จากล่างขึ้นบน)
-          for (const rNode of rebirthNodesOfSponsor) {
+          // 2.1 ตรวจสอบตำแหน่งติดตัวว่างของรหัสโคลนนิ่งตรงของผู้แนะนำ (เลือกขาซ้ายก่อนขาขวา)
+          for (const rNode of directRebirthNodesOfSponsor) {
             if (rNode.leftChild === 0) {
               return {
                 parentId: rNode.id,
@@ -1111,8 +1304,8 @@ export class MatrixSimulator {
             }
           }
 
-          // 2.2 หากขาติดตัวของรหัสโคลนนิ่งเต็มแล้ว ให้สแกนลงผังใต้รหัสโคลนนิ่งของผู้แนะนำ (จากล่างขึ้นบน)
-          for (const rNode of rebirthNodesOfSponsor) {
+          // 2.2 หากขาติดตัวของรหัสโคลนนิ่งตรงเต็มแล้ว ให้สแกนลงผังใต้รหัสโคลนนิ่งตรงของผู้แนะนำ
+          for (const rNode of directRebirthNodesOfSponsor) {
             const deepSlot = this.findNextEmptySlot(rNode.id);
             if (deepSlot) {
               return {
@@ -1120,6 +1313,43 @@ export class MatrixSimulator {
                 isRebirthTarget: true,
                 targetRebirthNodeId: rNode.id,
                 reason: `🌱 รอบที่ 1 (โยนสายงานใต้รหัสเกิดใหม่ Sponsor ID)${cycleNotice}: ส่งลงไปต่อใต้สายงานรหัสเกิดใหม่ #${rNode.id} ของ Sponsor ID #${sponsorNode.id} (ต่อใต้ #${deepSlot.parentId} ฝั่ง${deepSlot.isLeft ? 'ซ้าย' : 'ขวา'})`,
+              };
+            }
+          }
+
+          // 2.3 หากไม่มีโคลนตรง ให้สแกนหาโคลนอื่นในกระเป๋าเดียวกันของผู้แนะนำ
+          const otherRebirthNodesOfSponsor = Array.from(this.nodes.values())
+            .filter(
+              (n) =>
+                n.isRebirth &&
+                n.id !== sponsorNode.id &&
+                n.owner.toLowerCase() === sponsorNode.owner.toLowerCase() &&
+                n.rebornFromNodeId !== sponsorNode.id &&
+                n.originalAncestorId !== sponsorNode.id
+            )
+            .sort((a, b) => (a.depth !== b.depth ? a.depth - b.depth : a.id - b.id));
+
+          for (const rNode of otherRebirthNodesOfSponsor) {
+            if (rNode.leftChild === 0) {
+              return {
+                parentId: rNode.id,
+                isLeft: true,
+                parentOwner: rNode.owner,
+                depth: rNode.depth + 1,
+                isRebirthTarget: true,
+                targetRebirthNodeId: rNode.id,
+                reason: `🌱 รอบที่ 1 (โยนต่อให้รหัสเกิดใหม่ของ Sponsor ID ทันที)${cycleNotice}: แนะนำโดยไอดี Sponsor ID #${sponsorNode.id} (แต่เต็มทั้ง 2 ขาแล้ว) ➔ โยนสายงานจัดวางใต้รหัสเกิดใหม่บัญชีเดียวกัน #${rNode.id} (ฝั่งซ้าย)`,
+              };
+            }
+            if (rNode.rightChild === 0) {
+              return {
+                parentId: rNode.id,
+                isLeft: false,
+                parentOwner: rNode.owner,
+                depth: rNode.depth + 1,
+                isRebirthTarget: true,
+                targetRebirthNodeId: rNode.id,
+                reason: `🌱 รอบที่ 1 (โยนต่อให้รหัสเกิดใหม่ของ Sponsor ID ทันที)${cycleNotice}: แนะนำโดยไอดี Sponsor ID #${sponsorNode.id} (แต่เต็มทั้ง 2 ขาแล้ว) ➔ โยนสายงานจัดวางใต้รหัสเกิดใหม่บัญชีเดียวกัน #${rNode.id} (ฝั่งขวา)`,
               };
             }
           }
@@ -1651,6 +1881,8 @@ export class MatrixSimulator {
 
   // Handle 100% Math Payout (Both Left and Right downlines):
   // 1. 30% (1.5 USDT) -> เข้ากระเป๋าผู้แนะนำเราครั้งแรก (First Referrer / Sponsor)
+  //    เงื่อนไขเฉพาะ: หากเป็นไอดีโคลนนิ่งของ #1 (30% Direct Upline จะต้องส่งกลับไปให้ #1 เสมอ)
+  //    เช่น ในผัง ไอดี #4 มีไอดีโคลนนิ่งของ #1 มาต่อซ้าย -> #4 จะไม่ได้รับ 30% Direct Upline แต่ส่งกลับให้ #1
   // 2. 30% (1.5 USDT) -> โบนัส 15 ชั้น เริ่มจ่ายตั้งแต่ชั้นที่ 0 เลย (0.1 USDT ต่อชั้น)
   // 3. 40% (2.0 USDT) -> เข้า Upgrade Vault ของรหัสแม่ (parentId)
   private handleLeftChildPayout(childId: number, parentId: number, childOwner: string, sponsorNodeId?: number, isLeft: boolean = true) {
@@ -1658,33 +1890,58 @@ export class MatrixSimulator {
     const childNode = this.nodes.get(childId);
     const childWallet = this.wallets.get(childOwner.toLowerCase())!;
     const isChildWallet1 = childOwner.toLowerCase() === INITIAL_WALLETS[0].address.toLowerCase();
+    const parentWallet = this.wallets.get(parent.owner.toLowerCase());
+    const r1Queue = this.rankQueues.get(1) || [];
+    const parentQueueItem = r1Queue.find((q) => q.nodeId === parentId);
     
-    // Direct Upline: จ่ายให้รหัสแม่ (parentId) ที่เป็นผู้รับเงินโดยตรง (1.5 USDT)
-    const parentWallet = this.wallets.get(parent.owner.toLowerCase())!;
-    parentWallet.balance += DIRECT_BONUS;
-    parentWallet.totalEarned += DIRECT_BONUS;
-    parent.totalDirectEarned += DIRECT_BONUS;
+    // Direct Upline:
+    // เงื่อนไขเฉพาะ: หากเป็นไอดีโคลนนิ่งของ #1 (30% Direct Upline จะต้องส่งกลับไปให้ #1 เสมอ)
+    // เช่น ในผัง ไอดี #4 มีไอดีโคลนนิ่งของ #1 (#8 หรืออื่นๆ) มาต่อซ้าย -> #4 จะไม่ได้รับ 30% Direct Upline แต่ส่งกลับให้ #1
+    const isCloneOf1 = Boolean(
+      childNode &&
+      childId !== 1 &&
+      (childNode.isRebirth || childNode.isFromVault || childNode.paymentSource === 'excess_vault') &&
+      (childNode.originalAncestorId === 1 || childNode.rebornFromNodeId === 1 || isChildWallet1)
+    );
 
-    // Log Direct Bonus for Parent
+    const directRecipientId = isCloneOf1 ? 1 : parentId;
+    const recipientNode = this.nodes.get(directRecipientId);
+    const recipientWallet = recipientNode
+      ? this.wallets.get(recipientNode.owner.toLowerCase())
+      : (isCloneOf1 ? this.wallets.get(INITIAL_WALLETS[0].address.toLowerCase()) : (parentWallet || this.wallets.get(parent.owner.toLowerCase())));
+
+    if (recipientWallet) {
+      recipientWallet.balance = Math.round((recipientWallet.balance + DIRECT_BONUS) * 100) / 100;
+      recipientWallet.totalEarned = Math.round((recipientWallet.totalEarned + DIRECT_BONUS) * 100) / 100;
+    }
+    if (recipientNode) {
+      recipientNode.totalDirectEarned = Math.round((recipientNode.totalDirectEarned + DIRECT_BONUS) * 100) / 100;
+    }
+    this.recordDirectBonus(directRecipientId, 1, DIRECT_BONUS);
+
+    // Log Direct Bonus for Recipient
     this.addLog({
       type: 'DIRECT_BONUS',
-      title: `Direct Bonus Received: Node #${parentId} (+${DIRECT_BONUS.toFixed(2)} USDT)`,
-      description: `ได้รับค่าแนะนำตรง 30% จำนวน ${DIRECT_BONUS.toFixed(2)} USDT จากรหัส #${childId} (ผัง 1)`,
-      nodeId: parentId,
+      title: `Direct Bonus Received: Node #${directRecipientId} (+${DIRECT_BONUS.toFixed(2)} USDT)`,
+      description: isCloneOf1
+        ? `ได้รับค่าแนะนำตรง 30% จำนวน ${DIRECT_BONUS.toFixed(2)} USDT จากรหัสโคลนนิ่งของ #1 (รหัส #${childId}) ที่ไปต่อใต้ #${parentId}`
+        : `ได้รับค่าแนะนำตรง 30% จำนวน ${DIRECT_BONUS.toFixed(2)} USDT จากรหัส #${childId} (ผัง 1)`,
+      nodeId: directRecipientId,
       amount: DIRECT_BONUS,
       txHash: '0xdirect_bonus_' + Math.random().toString(16).substring(2, 8),
       details: {
         rank: 1,
         fromNodeId: childId,
         amount: DIRECT_BONUS,
+        isCloneOf1,
+        parentId,
       }
     });
 
-    // Sync to Rank 1 queue item for parent
-    const r1Queue = this.rankQueues.get(1) || [];
-    const parentQueueItem = r1Queue.find((q) => q.nodeId === parentId);
-    if (parentQueueItem) {
-      parentQueueItem.totalDirectEarned = Math.round((parentQueueItem.totalDirectEarned + DIRECT_BONUS) * 100) / 100;
+    // Sync to Rank 1 queue item for recipient
+    const recipientQueueItem = r1Queue.find((q) => q.nodeId === directRecipientId);
+    if (recipientQueueItem) {
+      recipientQueueItem.totalDirectEarned = Math.round((recipientQueueItem.totalDirectEarned + DIRECT_BONUS) * 100) / 100;
     }
 
     // 2. 40% Upgrade Vault (2.0 USDT)
@@ -1747,7 +2004,9 @@ export class MatrixSimulator {
     this.addLog({
       type: 'PAYOUT_LEFT',
       title: `100% Left Child Math Executed (5.0 USDT)`,
-      description: `30% Direct Upline (${DIRECT_BONUS} USDT) -> รหัส #${parentId} (${parentWallet.name}), 40% Upgrade Vault (${UPGRADE_VAULT_SHARE} USDT) -> รหัส #${parentId}, 30% โบนัส 15 ชั้นเริ่มตั้งแต่ชั้นที่ 0 (${distributedLevels} ชั้น * 0.1 USDT)${distributedLevels < MAX_LEVELS ? `, ค่าชั้นส่วนที่เหลือ ${((MAX_LEVELS - distributedLevels) * LEVEL_BONUS).toFixed(2)} USDT โอนเข้ากระเป๋ากลาง Treasury` : ''}`,
+      description: isCloneOf1
+        ? `30% Direct Upline (${DIRECT_BONUS} USDT) -> ส่งกลับไปให้รหัส #1 (${recipientWallet?.name || 'id1'}) [เนื่องจาก #${childId} เป็นโคลนนิ่งของ #1], 40% Upgrade Vault (${UPGRADE_VAULT_SHARE} USDT) -> รหัส #${parentId}, 30% โบนัส 15 ชั้นเริ่มตั้งแต่ชั้นที่ 0 (${distributedLevels} ชั้น * 0.1 USDT)${distributedLevels < MAX_LEVELS ? `, ค่าชั้นส่วนที่เหลือ ${((MAX_LEVELS - distributedLevels) * LEVEL_BONUS).toFixed(2)} USDT โอนเข้ากระเป๋ากลาง Treasury` : ''}`
+        : `30% Direct Upline (${DIRECT_BONUS} USDT) -> รหัส #${parentId} (${parentWallet?.name || `Node #${parentId}`}), 40% Upgrade Vault (${UPGRADE_VAULT_SHARE} USDT) -> รหัส #${parentId}, 30% โบนัส 15 ชั้นเริ่มตั้งแต่ชั้นที่ 0 (${distributedLevels} ชั้น * 0.1 USDT)${distributedLevels < MAX_LEVELS ? `, ค่าชั้นส่วนที่เหลือ ${((MAX_LEVELS - distributedLevels) * LEVEL_BONUS).toFixed(2)} USDT โอนเข้ากระเป๋ากลาง Treasury` : ''}`,
       nodeId: childId,
       parentId,
       amount: REGISTRATION_FEE,
@@ -1757,9 +2016,9 @@ export class MatrixSimulator {
         childId,
         parentId,
         directBonus: {
-          sponsorNodeId: parentId,
-          sponsorAddress: parent.owner.toLowerCase(),
-          sponsorName: parentWallet.name,
+          sponsorNodeId: directRecipientId,
+          sponsorAddress: recipientWallet?.address || (isCloneOf1 ? INITIAL_WALLETS[0].address.toLowerCase() : parent.owner.toLowerCase()),
+          sponsorName: recipientWallet?.name || (isCloneOf1 ? 'id1' : (parentWallet?.name || `Node #${parentId}`)),
           amount: DIRECT_BONUS,
         },
         levelBonus: {
@@ -2354,22 +2613,19 @@ export class MatrixSimulator {
       };
     }
 
-    // ขั้นที่ 2: หากติดตัวผู้แนะนำเต็มทั้ง 2 ขาแล้ว ระบบจะโยนสายงาน (Auto-Spillover) ลงไปจัดวางใต้ รหัสโคลนของผู้แนะนำเท่านั้น จากล่างสุดขึ้นบน ที่ยังว่างอยู่ (ลงซ้ายหรือขวาก็ได้)
-    // ค้นหารหัสโคลนทั้งหมดของ Sponsor ID ในผังที่ 1 เรียงลำดับจากล่างสุดขึ้นบน (Depth มากไปน้อย และ ID มากไปน้อย / รหัสใหม่ล่าสุดก่อน)
-    const sponsorOwner = sponsor.owner.toLowerCase();
-    const cloneNodes = Array.from(this.nodes.values())
+    // ขั้นที่ 2: หากติดตัวผู้แนะนำเต็มทั้ง 2 ขาแล้ว ระบบจะโยนสายงาน (Auto-Spillover) ลงไปจัดวางใต้ รหัสโคลนนิ่งของผู้แนะนำโดยตรงก่อนเสมอ (เช่น ผู้แนะนำคือ #1 ต้องไปต่อโคลนนิ่งของ #1 ก่อน เช่น #11)
+    // 2.1 ค้นหารหัสโคลนตรงทั้งหมดของ Sponsor ID ในผังที่ 1 (เรียงจากบนลงล่าง และตามลำดับ ID)
+    const directCloneNodes = Array.from(this.nodes.values())
       .filter(
         (n) =>
           n.isRebirth &&
           n.id !== sponsor.id &&
-          (n.originalAncestorId === sponsor.id ||
-            n.rebornFromNodeId === sponsor.id ||
-            n.owner.toLowerCase() === sponsorOwner)
+          (n.originalAncestorId === sponsor.id || n.rebornFromNodeId === sponsor.id)
       )
-      .sort((a, b) => (a.depth !== b.depth ? b.depth - a.depth : b.id - a.id));
+      .sort((a, b) => (a.depth !== b.depth ? a.depth - b.depth : a.id - b.id));
 
-    // 2.1 ค้นหาตำแหน่งว่างติดตัวของรหัสโคลนของ Sponsor ID เท่านั้น จากล่างสุดขึ้นบน (ลงซ้ายหรือขวาก็ได้)
-    for (const cNode of cloneNodes) {
+    // 2.2 ตรวจสอบตำแหน่งว่างติดตัวของรหัสโคลนตรงของผู้แนะนำก่อนเสมอ (ซ้ายก่อน ขวา)
+    for (const cNode of directCloneNodes) {
       if (cNode.leftChild === 0) {
         return {
           parentId: cNode.id,
@@ -2378,7 +2634,7 @@ export class MatrixSimulator {
           depth: cNode.depth + 1,
           isRebirthTarget: true,
           targetRebirthNodeId: cNode.id,
-          reason: `ขั้นที่ 2: ผู้แนะนำ #${sponsor.id} เต็ม 2 ขา ➔ โยนสายงานจัดวางใต้รหัสโคลนของผู้แนะนำ #${cNode.id} เท่านั้น จากล่างสุดขึ้นบน (ฝั่งซ้าย)`,
+          reason: `ขั้นที่ 2: ผู้แนะนำ #${sponsor.id} เต็ม 2 ขา ➔ โยนสายงานจัดวางใต้รหัสโคลนนิ่งของผู้แนะนำ #${cNode.id} (ฝั่งซ้าย)`,
         };
       }
       if (cNode.rightChild === 0) {
@@ -2389,25 +2645,63 @@ export class MatrixSimulator {
           depth: cNode.depth + 1,
           isRebirthTarget: true,
           targetRebirthNodeId: cNode.id,
-          reason: `ขั้นที่ 2: ผู้แนะนำ #${sponsor.id} เต็ม 2 ขา ➔ โยนสายงานจัดวางใต้รหัสโคลนของผู้แนะนำ #${cNode.id} เท่านั้น จากล่างสุดขึ้นบน (ฝั่งขวา)`,
+          reason: `ขั้นที่ 2: ผู้แนะนำ #${sponsor.id} เต็ม 2 ขา ➔ โยนสายงานจัดวางใต้รหัสโคลนนิ่งของผู้แนะนำ #${cNode.id} (ฝั่งขวา)`,
         };
       }
     }
 
-    // 2.2 หากตำแหน่งติดตัวของรหัสโคลนทุกตัวเต็มทั้ง 2 ขา ให้สแกนสายงาน (Subtree Spillover) ใต้รหัสโคลนของผู้แนะนำเท่านั้น เรียงจากล่างขึ้นบน
-    for (const cNode of cloneNodes) {
+    // 2.3 หากตำแหน่งติดตัวของรหัสโคลนตรงทุกตัวเต็มทั้ง 2 ขา ให้สแกนสายงาน (Subtree Spillover) ใต้รหัสโคลนตรงของผู้แนะนำ (เรียงจากบนลงล่าง)
+    for (const cNode of directCloneNodes) {
       const deepSlot = this.findNextEmptySlot(cNode.id, 1);
       if (deepSlot) {
         return {
           ...deepSlot,
           isRebirthTarget: true,
           targetRebirthNodeId: cNode.id,
-          reason: `ขั้นที่ 2: โยนสายงาน (Auto-Spillover) ลงใต้สายงานรหัสโคลนของผู้แนะนำ #${cNode.id} เท่านั้น จากล่างขึ้นบน (ต่อใต้ #${deepSlot.parentId} ฝั่ง${deepSlot.isLeft ? 'ซ้าย' : 'ขวา'})`,
+          reason: `ขั้นที่ 2: โยนสายงาน (Auto-Spillover) ลงใต้สายงานรหัสโคลนนิ่งของผู้แนะนำ #${cNode.id} (ต่อใต้ #${deepSlot.parentId} ฝั่ง${deepSlot.isLeft ? 'ซ้าย' : 'ขวา'})`,
         };
       }
     }
 
-    // 2.3 กรณีผู้แนะนำยังไม่มีรหัสโคลนเกิดขึ้น ให้โยนสายงานลงใต้สายงานของผู้แนะนำตรง
+    // 2.4 หากผู้แนะนำตรงยังไม่มีรหัสโคลนเลย ให้ตรวจหาโคลนอื่นในกระเป๋าเดียวกัน (ถ้ามี)
+    const sponsorOwner = sponsor.owner.toLowerCase();
+    const otherCloneNodes = Array.from(this.nodes.values())
+      .filter(
+        (n) =>
+          n.isRebirth &&
+          n.id !== sponsor.id &&
+          n.owner.toLowerCase() === sponsorOwner &&
+          n.originalAncestorId !== sponsor.id &&
+          n.rebornFromNodeId !== sponsor.id
+      )
+      .sort((a, b) => (a.depth !== b.depth ? a.depth - b.depth : a.id - b.id));
+
+    for (const cNode of otherCloneNodes) {
+      if (cNode.leftChild === 0) {
+        return {
+          parentId: cNode.id,
+          isLeft: true,
+          parentOwner: cNode.owner,
+          depth: cNode.depth + 1,
+          isRebirthTarget: true,
+          targetRebirthNodeId: cNode.id,
+          reason: `ขั้นที่ 2: ผู้แนะนำ #${sponsor.id} เต็ม 2 ขาและไม่มีโคลนตรงว่าง ➔ โยนสายงานใต้โคลนกระเป๋าเดียวกัน #${cNode.id} (ฝั่งซ้าย)`,
+        };
+      }
+      if (cNode.rightChild === 0) {
+        return {
+          parentId: cNode.id,
+          isLeft: false,
+          parentOwner: cNode.owner,
+          depth: cNode.depth + 1,
+          isRebirthTarget: true,
+          targetRebirthNodeId: cNode.id,
+          reason: `ขั้นที่ 2: ผู้แนะนำ #${sponsor.id} เต็ม 2 ขาและไม่มีโคลนตรงว่าง ➔ โยนสายงานใต้โคลนกระเป๋าเดียวกัน #${cNode.id} (ฝั่งขวา)`,
+        };
+      }
+    }
+
+    // 2.5 กรณีผู้แนะนำยังไม่มีรหัสโคลนเกิดขึ้น ให้โยนสายงานลงใต้สายงานของผู้แนะนำตรง
     const subSlot = this.findNextEmptySlot(sponsor.id, 1);
     if (subSlot) {
       return {
@@ -2416,7 +2710,7 @@ export class MatrixSimulator {
       };
     }
 
-    // 2.4 Fallback ผังรวม
+    // 2.6 Fallback ผังรวม
     const globalSlot = this.findNextEmptySlot(1, 1);
     if (globalSlot) {
       return {
@@ -4402,6 +4696,8 @@ export class MatrixSimulator {
       }
     }
 
+    const initialDirectEarned = this.getDirectBonusByRank(nodeId, safeRank);
+
     const newQueueItem: RankQueueNode = {
       queueNumber: newQueueNumber,
       nodeId,
@@ -4413,7 +4709,7 @@ export class MatrixSimulator {
       rightChildQueueNumber: 0,
       isLeft,
       upgradeVault: 0,
-      totalDirectEarned: 0,
+      totalDirectEarned: initialDirectEarned,
       totalLevelEarned: 0,
       rebirthCount: 0,
       pendingRebirths: 0,
@@ -4472,11 +4768,12 @@ export class MatrixSimulator {
       if (sponsorNode) {
         sponsorNode.totalDirectEarned = Math.round((sponsorNode.totalDirectEarned + directBonus) * 100) / 100;
       }
+      this.recordDirectBonus(directSponsorNodeId, safeRank, directBonus);
       
       // Also update the queue item for the sponsor in this rank queue
       const sponsorQueueItem = queue.find((q) => q.nodeId === directSponsorNodeId) || queue.find((q) => q.owner.toLowerCase() === sponsorAddress.toLowerCase());
       if (sponsorQueueItem) {
-        sponsorQueueItem.totalDirectEarned = Math.round((sponsorQueueItem.totalDirectEarned + directBonus) * 100) / 100;
+        sponsorQueueItem.totalDirectEarned = this.getDirectBonusByRank(directSponsorNodeId, safeRank);
       }
 
       if (sponsorWallet) {
@@ -5226,20 +5523,22 @@ export class MatrixSimulator {
     let totalDirect = 0;
     let totalLevel = 0;
 
-    // รวมรายได้จากผังที่ 1 ถึง 45 จาก rankQueues โดยตรง (ป้องกันการนับซ้ำกับ this.nodes)
+    // 1. รวมโบนัส 15 ชั้น (Level Bonus) จาก rankQueues โดยตรง (เนื่องจาก Level Bonus จะจ่ายให้เมื่ออยู่ในผังนั้นจริงเท่านั้น)
     for (let r = 1; r <= MAX_RANK; r++) {
       const q = this.rankQueues.get(r);
       if (q) {
         for (const qItem of q) {
-          // ค่าแนะนำตรง (Direct Sponsor) รวมยอดของตระกูล (ID หลัก + รหัสโคลนนิ่ง)
           if (familyNodeIds.has(qItem.nodeId)) {
-            totalDirect += (qItem.totalDirectEarned || 0);
-          }
-          // Level Bonus คิดเฉพาะของรหัส ID นี้ตามลำดับชั้นของสายงาน
-          if (qItem.nodeId === nodeId) {
             totalLevel += (qItem.totalLevelEarned || 0);
           }
         }
+      }
+    }
+
+    // 2. รวมค่าแนะนำตรง (Direct Sponsor 30%) สะสมของตระกูลจาก global nodes โดยตรง เพื่อความถูกต้องสูงสุดและรองรับการสะสมรายได้ในอดีต (Backward Compatibility)
+    for (const n of this.nodes.values()) {
+      if (familyNodeIds.has(n.id)) {
+        totalDirect += (n.totalDirectEarned || 0);
       }
     }
 
@@ -5286,5 +5585,58 @@ export class MatrixSimulator {
       discrepancy,
       isPerfect,
     };
+  }
+
+  // ปรับปรุงผลประโยชน์ค่าแนะนำตรง 30% เฉพาะกรณีไอดีโคลนนิ่งของ #1
+  // กฎ: เฉพาะไอดีโคลนนิ่งของ #1 (30% Direct Upline จะต้องส่งกลับไปให้ #1 เสมอ)
+  // หากรหัสแม่ใด (เช่น #4) มีไอดีโคลนนิ่งของ #1 มาต่อซ้าย -> รหัสแม่นั้นจะไม่ได้รับ 30% Direct Upline แต่ส่งกลับให้ #1
+  reconcileCloneOf1DirectBonuses(): void {
+    const node1 = this.nodes.get(1);
+    const wallet1 = this.wallets.get(INITIAL_WALLETS[0].address.toLowerCase());
+    const q1 = this.rankQueues.get(1) || [];
+    const qItem1 = q1.find((q) => q.nodeId === 1);
+
+    for (const parent of this.nodes.values()) {
+      if (parent.leftChild > 0) {
+        const leftNode = this.nodes.get(parent.leftChild);
+        if (
+          leftNode &&
+          leftNode.id !== 1 &&
+          (leftNode.isRebirth || leftNode.isFromVault || leftNode.paymentSource === 'excess_vault') &&
+          (leftNode.originalAncestorId === 1 || leftNode.rebornFromNodeId === 1 || leftNode.owner.toLowerCase() === INITIAL_WALLETS[0].address.toLowerCase())
+        ) {
+          // leftNode เป็นโคลนนิ่งของ #1!
+          // ตรวจสอบว่า parent ได้รับ direct bonus ในผัง 1 หรือไม่ ถ้ามีให้ย้ายกลับไปให้ #1
+          const parentDirectR1 = this.nodeDirectEarnedByRank.get(parent.id)?.get(1) || 0;
+          if (parentDirectR1 >= DIRECT_BONUS || parent.totalDirectEarned >= DIRECT_BONUS) {
+            const amountToDeduct = Math.min(DIRECT_BONUS, parent.totalDirectEarned);
+            this.recordDirectBonus(parent.id, 1, -amountToDeduct);
+            parent.totalDirectEarned = Math.max(0, Math.round((parent.totalDirectEarned - amountToDeduct) * 100) / 100);
+            const pWallet = this.wallets.get(parent.owner.toLowerCase());
+            if (pWallet) {
+              pWallet.balance = Math.max(0, Math.round((pWallet.balance - amountToDeduct) * 100) / 100);
+              pWallet.totalEarned = Math.max(0, Math.round((pWallet.totalEarned - amountToDeduct) * 100) / 100);
+            }
+            const pQItem = q1.find((q) => q.nodeId === parent.id);
+            if (pQItem) {
+              pQItem.totalDirectEarned = Math.max(0, Math.round((pQItem.totalDirectEarned - amountToDeduct) * 100) / 100);
+            }
+
+            // เพิ่มให้ #1
+            this.recordDirectBonus(1, 1, amountToDeduct);
+            if (node1) {
+              node1.totalDirectEarned = Math.round((node1.totalDirectEarned + amountToDeduct) * 100) / 100;
+            }
+            if (wallet1) {
+              wallet1.balance = Math.round((wallet1.balance + amountToDeduct) * 100) / 100;
+              wallet1.totalEarned = Math.round((wallet1.totalEarned + amountToDeduct) * 100) / 100;
+            }
+            if (qItem1) {
+              qItem1.totalDirectEarned = Math.round((qItem1.totalDirectEarned + amountToDeduct) * 100) / 100;
+            }
+          }
+        }
+      }
+    }
   }
 }

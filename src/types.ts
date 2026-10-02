@@ -190,3 +190,33 @@ export interface ExcessRebirthVaultSummary {
   formulaText: string;
 }
 
+export type CentralPoolType = 'POOL_1_REBIRTH' | 'POOL_2_EXCESS_VAULT_1_5' | 'POOL_3_EXCESS_VAULT_6_45';
+
+export type CentralPoolActionType = 
+  | 'RIGHT_CHILD_INFLOW'       // ลูกขวาเข้าผัง 100% เข้ากองกลาง
+  | 'DIRECT_BONUS_INFLOW'      // ผู้แนะนำตรง ID 1 เข้ากองกลาง
+  | 'LEVEL_BONUS_INFLOW'       // ชั้น ID 1 เข้ากองกลาง
+  | 'TREASURY_RESIDUAL_INFLOW' // ค่าชั้นส่วนที่เหลือเข้ากองกลาง
+  | 'REBIRTH_SPAWNED'          // กองกลางจ่ายค่าคลอดโคลนนิ่ง
+  | 'EXCESS_VAULT_INFLOW'      // ส่วนเกิน 40% Vault ไหลเข้ากองกลาง
+  | 'NEW_MAIN_ID_CREATED'      // นำส่วนเกินไปเปิด New Main ID ผัง 1
+  | 'NEW_MEMBER_CREATED'       // นำส่วนเกินไปเปิด New Member ผัง 45->2 ("ไปต่อตัวเอง")
+  | 'ADMIN_SWEEP';             // แอดมินกวาดเงินกองกลาง
+
+export interface CentralPoolTransaction {
+  id: string;
+  timestamp: number;
+  poolType: CentralPoolType;
+  poolTitle: string;
+  direction: 'IN' | 'OUT'; // IN = เงินเข้ากองกลาง, OUT = เงินออกจากกองกลาง (นำไปใช้)
+  amount: number;
+  rank: number;
+  sourceNodeId?: number;     // รหัสต้นทางที่ส่งเงินเข้า หรือสั่งทำรายการ
+  beneficiaryNodeId?: number; // รหัสปลายทางที่ได้รับโคลนนิ่ง / New Main ID / New Member
+  mainId?: number;            // นิวไอดี (หลัก) ที่เกี่ยวข้อง
+  actionType: CentralPoolActionType;
+  description: string;
+  balanceAfter?: number;
+  txHash: string;
+}
+

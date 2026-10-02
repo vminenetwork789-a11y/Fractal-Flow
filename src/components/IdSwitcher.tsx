@@ -205,7 +205,7 @@ export const IdSwitcher: React.FC<IdSwitcherProps> = ({
             ) : (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-700/60 flex items-center gap-1">
                 <Crown className="w-3 h-3 text-amber-400" />
-                <span>{currentNode.id === 1 ? 'id1' : t('mainId')}</span>
+                <span>{currentNode.id === 1 ? 'id1 (กองกลาง)' : t('mainId')}</span>
               </span>
             )}
 

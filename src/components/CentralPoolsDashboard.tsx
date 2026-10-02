@@ -17,7 +17,9 @@ import {
   Play,
   X,
   Timer,
+  History,
 } from 'lucide-react';
+import { CentralPoolHistoryView } from './CentralPoolHistoryView';
 
 interface CentralPoolsDashboardProps {
   simulator: MatrixSimulator;
@@ -72,7 +74,7 @@ export const CentralPoolsDashboard: React.FC<CentralPoolsDashboardProps> = ({
   onCancelAuto,
   nodes,
 }) => {
-  const [activePoolTab, setActivePoolTab] = useState<'all' | 'cloning' | 'newMainId' | 'rank6to45'>('all');
+  const [activePoolTab, setActivePoolTab] = useState<'all' | 'cloning' | 'newMainId' | 'rank6to45' | 'history'>('all');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -181,6 +183,17 @@ export const CentralPoolsDashboard: React.FC<CentralPoolsDashboardProps> = ({
               }`}
             >
               🟢 ผัง 6-45
+            </button>
+            <button
+              onClick={() => setActivePoolTab('history')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                activePoolTab === 'history'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-amber-300 hover:bg-amber-950/40'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>📜 ประวัตกองกลาง</span>
             </button>
           </div>
         </div>
@@ -617,6 +630,34 @@ export const CentralPoolsDashboard: React.FC<CentralPoolsDashboardProps> = ({
           </div>
         )}
       </div>
+
+      {/* History Tab View */}
+      {activePoolTab === 'history' && (
+        <div className="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+          <div className="flex items-center space-x-2.5 pb-2 border-b border-slate-800">
+            <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <History className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+                <span>สมุดบัญชีบันทึกประวัตกองกลาง (Central Pools Audit History)</span>
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                ประวัติธุรกรรมเงินเข้า-ออกจากทั้ง 3 กองกลาง ตรวจสอบความถูกต้องได้ทุกขั้นตอน
+              </p>
+            </div>
+          </div>
+
+          <CentralPoolHistoryView
+            history={simulator.getCentralPoolHistory()}
+            rebirthPoolBalance={poolsData.pool1?.amount || 0}
+            totalSystemVaultRank1To5={poolsData.pool2?.systemTotal || 0}
+            totalSystemVaultRank6To45={poolsData.pool3?.systemTotal || 0}
+            selectedNodeId={selectedNodeId}
+            onSelectNodeId={onSelectNodeId}
+          />
+        </div>
+      )}
 
       {/* Footer Info Strip */}
       <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-slate-400">
