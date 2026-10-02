@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wallet, ShieldCheck, ShieldAlert, Cpu, RefreshCw, Layers, ArrowLeftRight } from 'lucide-react';
+import { Wallet, ShieldCheck, ShieldAlert, Cpu, RefreshCw, Layers, ArrowLeftRight, History } from 'lucide-react';
 import { WalletAccount, MatrixNode, AppNotification, NotificationType } from '../types';
 import { MAX_RANK } from '../lib/matrixSimulator';
 import { useLanguage, LanguageSelector } from '../i18n/LanguageContext';
@@ -15,8 +15,8 @@ interface NavbarProps {
   onDisconnectWeb3: () => void;
   rebirthPool: number;
   totalNodes: number;
-  activeTab: 'app' | 'contract' | 'math' | 'keeper' | 'admin';
-  setActiveTab: (tab: 'app' | 'contract' | 'math' | 'keeper' | 'admin') => void;
+  activeTab: 'app' | 'contract' | 'math' | 'keeper' | 'admin' | 'centralPool';
+  setActiveTab: (tab: 'app' | 'contract' | 'math' | 'keeper' | 'admin' | 'centralPool') => void;
   onResetSimulation: () => void;
   isPaused?: boolean;
   selectedNodeId?: number;
@@ -120,6 +120,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               {t('tabMath')}
+            </button>
+            <button
+              id="tab-centralpool-btn"
+              onClick={() => setActiveTab('centralPool')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1.5 ${
+                activeTab === 'centralPool'
+                  ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-600 text-white shadow-md font-bold'
+                  : 'text-purple-300 hover:text-white hover:bg-slate-700/50'
+              }`}
+            >
+              <History className="w-3.5 h-3.5 text-purple-400" />
+              <span>ประวัติ #0 (id0)</span>
             </button>
             <button
               id="tab-admin-btn"
@@ -296,6 +308,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             {t('tabMath')}
+          </button>
+          <button
+            onClick={() => setActiveTab('centralPool')}
+            className={`px-3 py-1.5 rounded-lg whitespace-nowrap font-medium transition-all flex items-center space-x-1 ${
+              activeTab === 'centralPool'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-600 text-white shadow-sm font-bold'
+                : 'bg-slate-800/60 text-purple-300 border border-purple-700/50'
+            }`}
+          >
+            <History className="w-3 h-3 text-purple-400" />
+            <span>ประวัติ #0 (id0)</span>
           </button>
           <button
             onClick={() => setActiveTab('admin')}

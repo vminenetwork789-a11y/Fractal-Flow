@@ -37,10 +37,10 @@ export const CentralPoolHistoryModal: React.FC<CentralPoolHistoryModalProps> = (
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                <span>📜 ประวัตid0(Central Pools History & Ledger)</span>
+                <span>📜 ประวัติ #0 (id0 Treasury Ledger)</span>
               </h3>
               <p className="text-xs text-slate-400">
-                ประวัติการรับเงินเข้า 100% เม็ดขวา และการจ่ายเงินเพื่อคลอดโคลนนิ่ง / เปิด New Main ID ครบทั้ง 3 กองกลาง
+                สมุดบัญชีกระเป๋ากลาง ID #0: ค่าแนะนำตรงจากโคลนนิ่ง ID #1 (30%) และค่าชั้นส่วนที่เหลือ 15 ชั้น
               </p>
             </div>
           </div>

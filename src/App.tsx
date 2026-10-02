@@ -12,6 +12,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { IdSwitcher } from './components/IdSwitcher';
 import { CentralPoolsDashboard } from './components/CentralPoolsDashboard';
 import { CentralPoolHistoryModal } from './components/CentralPoolHistoryModal';
+import { CentralPoolHistoryView } from './components/CentralPoolHistoryView';
 import { useLanguage } from './i18n/LanguageContext';
 import { ethers } from 'ethers';
 import {
@@ -41,8 +42,8 @@ export default function App() {
   const [nodes, setNodes] = useState<MatrixNode[]>([]);
   const [wallets, setWallets] = useState<WalletAccount[]>([]);
   const [selectedWalletAddress, setSelectedWalletAddress] = useState<string>('0x2222222222222222222222222222222222222222');
-  const [selectedNodeId, setSelectedNodeId] = useState<number>(0);
-  const [activeTab, setActiveTab] = useState<'app' | 'contract' | 'math' | 'keeper' | 'admin'>('app');
+  const [selectedNodeId, setSelectedNodeId] = useState<number>(1);
+  const [activeTab, setActiveTab] = useState<'app' | 'contract' | 'math' | 'keeper' | 'admin' | 'centralPool'>('app');
   const [quickTarget, setQuickTarget] = useState<{ parentId: number; isLeft: boolean } | null>(null);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [treasuryAddress, setTreasuryAddress] = useState<string>('0x1111111111111111111111111111111111111111');
@@ -108,8 +109,8 @@ export default function App() {
         console.warn('Auto relocate #13 -> #11:', e);
       }
     }
-    // Reconcile 30% Direct Upline bonus for clones of #0 (must go to #0, not parent)
-    simulator.reconcileCloneOf0DirectBonuses();
+    // Reconcile 30% Direct Upline bonus for clones of #1 (must go to #1, not parent)
+    simulator.reconcileCloneOf1DirectBonuses();
     refreshSimulatorState();
     const unsubscribe = simulator.onNotification(() => {
       setNotifications([...simulator.getNotifications()]);
@@ -435,7 +436,7 @@ export default function App() {
       simulator.emitNotification({
         type: 'REGISTRATION',
         title: '🎉 มีการสมัครสมาชิกใหม่ (ทดสอบ)',
-        message: `รหัส #${nodes.length + 1 || 99} (${currentWallet.name}) สมัครสมาชิกต่อใต้ #${selectedNodeId !== undefined ? selectedNodeId : 0} ฝั่งซ้าย [5.00 USDT]`,
+        message: `รหัส #${nodes.length + 1 || 99} (${currentWallet.name}) สมัครสมาชิกต่อใต้ #${selectedNodeId || 1} ฝั่งซ้าย [5.00 USDT]`,
         nodeId: nodes.length + 1 || 99,
         rank: 1,
         amount: 5.0,
@@ -446,7 +447,7 @@ export default function App() {
       simulator.emitNotification({
         type: 'REBIRTH',
         title: '🌱 รหัสเกิดใหม่ทำงานสำเร็จ (ทดสอบ)',
-        message: `รหัสเกิดใหม่ #${nodes.length + 1 || 99} คลอดจากไอดีหลัก #${selectedNodeId !== undefined ? selectedNodeId : 0} สู่ผังต้นไม้ [5.00 USDT]`,
+        message: `รหัสเกิดใหม่ #${nodes.length + 1 || 99} คลอดจากไอดีหลัก #${selectedNodeId || 1} สู่ผังต้นไม้ [5.00 USDT]`,
         nodeId: nodes.length + 1 || 99,
         rank: 1,
         amount: 5.0,
@@ -457,8 +458,8 @@ export default function App() {
       simulator.emitNotification({
         type: 'UPGRADE',
         title: '⭐ เลื่อนขั้นผังสำเร็จ (ทดสอบ)',
-        message: `รหัสหลัก #${selectedNodeId !== undefined ? selectedNodeId : 0} (${currentWallet.name}) อัพเกรดสู่ ผัง 2 (Bronze Member) [10.00 USDT]`,
-        nodeId: selectedNodeId !== undefined ? selectedNodeId : 0,
+        message: `รหัสหลัก #${selectedNodeId || 1} (${currentWallet.name}) อัพเกรดสู่ ผัง 2 (Bronze Member) [10.00 USDT]`,
+        nodeId: selectedNodeId || 1,
         rank: 2,
         amount: 10.0,
         walletName: currentWallet.name,
@@ -853,6 +854,40 @@ export default function App() {
         {activeTab === 'contract' && <SolidityCodeViewer />}
 
         {activeTab === 'math' && <MathExplainer />}
+
+        {activeTab === 'centralPool' && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between p-4 sm:p-5 rounded-3xl bg-slate-900 border border-purple-500/30 shadow-xl">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/20">
+                  <History className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-xl font-bold text-white flex items-center gap-2">
+                    <span>📜 หน้าประวัติ #0 (id0 Treasury Ledger)</span>
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+                    สมุดบัญชีกระเป๋ากลาง ID #0: ค่าแนะนำตรง 30% จากรหัสโคลนนิ่งของ ID #1 และค่าชั้นส่วนที่เหลือ 15 ชั้น (Treasury Residual)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 sm:p-6 rounded-3xl bg-slate-900 border border-slate-800/80 shadow-2xl">
+              <CentralPoolHistoryView
+                history={simulator.getCentralPoolHistory()}
+                rebirthPoolBalance={simulator.rebirthPool}
+                totalSystemVaultRank1To5={simulator.getTotalSystemExcessVaultRank1To5()}
+                totalSystemVaultRank6To45={simulator.getTotalSystemExcessVaultRank6To45()}
+                selectedNodeId={selectedNodeId}
+                onSelectNodeId={(id) => {
+                  setSelectedNodeId(id);
+                  setActiveTab('app');
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {activeTab === 'keeper' && (
           <RebirthManager

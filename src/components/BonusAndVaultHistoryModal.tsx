@@ -115,7 +115,15 @@ export const BonusAndVaultHistoryModal: React.FC<BonusAndVaultHistoryModalProps>
         const matchParent = log.parentId === targetId;
         const matchFrom = log.details?.fromNodeId === targetId;
         const matchSponsor = log.details?.sponsorNodeId === targetId || log.details?.directBonus?.sponsorNodeId === targetId;
-        if (!matchMain && !matchParent && !matchFrom && !matchSponsor) return false;
+        const matchTreasury = targetId === 0 && (
+          log.nodeId === 0 ||
+          log.parentId === 0 ||
+          log.details?.treasuryWalletName === 'id0' ||
+          log.details?.treasuryAddress === '0x0000000000000000000000000000000000000000' ||
+          log.title.includes('โอนเข้ากระเป๋ากลาง') ||
+          log.title.includes('Node #0')
+        );
+        if (!matchMain && !matchParent && !matchFrom && !matchSponsor && !matchTreasury) return false;
       }
 
       // Rank filter
@@ -477,7 +485,7 @@ export const BonusAndVaultHistoryModal: React.FC<BonusAndVaultHistoryModalProps>
                           <div className="space-y-0.5">
                             <span className="text-[10px] text-emerald-400 font-semibold block">🎯 ค่าแนะนำตรง (30%)</span>
                             <span className="text-[10.5px] text-slate-300 block">
-                              โอนให้ #{[directInfo?.sponsorNodeId, details.directSponsorNodeId, log.parentId].find(x => typeof x === 'number') ?? 1}
+                              โอนให้ #{directInfo?.sponsorNodeId || details.directSponsorNodeId || log.parentId || 1}
                             </span>
                           </div>
                           <span className="font-mono font-bold text-emerald-300 text-xs">
@@ -503,7 +511,7 @@ export const BonusAndVaultHistoryModal: React.FC<BonusAndVaultHistoryModalProps>
                           <div className="space-y-0.5">
                             <span className="text-[10px] text-amber-400 font-semibold block">🔒 เข้า Vault (40%)</span>
                             <span className="text-[10.5px] text-slate-300 block">
-                              เข้า Vault ของ #{typeof log.parentId === 'number' ? log.parentId : 1}
+                              เข้า Vault ของ #{log.parentId || 1}
                             </span>
                           </div>
                           <span className="font-mono font-bold text-amber-300 text-xs">
@@ -549,7 +557,7 @@ export const BonusAndVaultHistoryModal: React.FC<BonusAndVaultHistoryModalProps>
                           <div>
                             <span className="text-slate-500 block">รหัสสมาชิกเจ้าของเหตุการณ์:</span>
                             <span className="font-semibold text-white font-mono">
-                              Node #{typeof log.nodeId === 'number' ? log.nodeId : '-'} {typeof log.parentId === 'number' ? `(อยู่ใต้ Parent #${log.parentId})` : ''}
+                              Node #{log.nodeId || '-'} {log.parentId ? `(อยู่ใต้ Parent #${log.parentId})` : ''}
                             </span>
                           </div>
                           <div>

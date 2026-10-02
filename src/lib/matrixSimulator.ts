@@ -190,7 +190,7 @@ export class MatrixSimulator {
     return id;
   }
   rebirthPool: number = 0;
-  treasuryBalance: number = 5.0;
+  treasuryBalance: number = 0;
   isPaused: boolean = false;
   treasuryAddress: string = '0x0000000000000000000000000000000000000000';
   logs: ActivityLog[] = [];
@@ -216,110 +216,52 @@ export class MatrixSimulator {
     }
     const synthesized: CentralPoolTransaction[] = [];
     for (const log of this.logs) {
-      if (log.type === 'REBIRTH_TRIGGER') {
+      // Note: กองที่ 1 (Rebirth โคลนนิ่ง) ถูกตัดออกจากประวัติ ID 0 ตามความต้องการของผู้ใช้
+
+      if (log.type === 'DIRECT_BONUS' && (log.nodeId === 0 || log.details?.redirectToTreasury)) {
         synthesized.push({
           id: log.id,
           timestamp: log.timestamp,
-          poolType: 'POOL_1_REBIRTH',
-          poolTitle: 'กองที่ 1: Rebirth Pool สำหรับโคลนนิ่ง',
-          direction: 'IN',
-          amount: log.amount || REGISTRATION_FEE,
-          rank: log.details?.rank || 1,
-          sourceNodeId: log.nodeId,
-          beneficiaryNodeId: log.parentId,
-          actionType: 'RIGHT_CHILD_INFLOW',
-          description: log.description,
-          txHash: log.txHash || '0xrebirth_inflow',
-        });
-      } else if (log.type === 'REBIRTH_EXECUTED') {
-        synthesized.push({
-          id: log.id,
-          timestamp: log.timestamp,
-          poolType: 'POOL_1_REBIRTH',
-          poolTitle: 'กองที่ 1: Rebirth Pool สำหรับโคลนนิ่ง',
-          direction: 'OUT',
-          amount: log.amount || REGISTRATION_FEE,
-          rank: 1,
-          sourceNodeId: log.nodeId,
-          beneficiaryNodeId: log.nodeId,
-          actionType: 'REBIRTH_SPAWNED',
-          description: log.description,
-          txHash: log.txHash || '0xrebirth_spawned',
-        });
-      } else if (log.type === 'DIRECT_BONUS' && (log.nodeId === 1 || log.nodeId === 0)) {
-        synthesized.push({
-          id: log.id,
-          timestamp: log.timestamp,
-          poolType: 'POOL_1_REBIRTH',
-          poolTitle: 'กองที่ 1: Rebirth Pool สำหรับโคลนนิ่ง',
+          poolType: 'POOL_ID0_TREASURY',
+          poolTitle: 'กระเป๋ากลาง ID #0 (ค่าแนะนำตรงโคลนนิ่ง)',
           direction: 'IN',
           amount: log.amount || 1.5,
           rank: log.details?.rank || 1,
           sourceNodeId: log.details?.fromNodeId || log.nodeId,
-          beneficiaryNodeId: log.nodeId,
+          beneficiaryNodeId: 0,
           actionType: 'DIRECT_BONUS_INFLOW',
           description: log.description,
           txHash: log.txHash || '0xdirect_bonus_inflow',
         });
-      } else if (log.type === 'LEVEL_BONUS' && (log.nodeId === 1 || log.nodeId === 0)) {
+      } else if (log.type === 'LEVEL_BONUS' && log.nodeId === 0) {
         synthesized.push({
           id: log.id,
           timestamp: log.timestamp,
-          poolType: 'POOL_1_REBIRTH',
-          poolTitle: 'กองที่ 1: Rebirth Pool สำหรับโคลนนิ่ง',
+          poolType: 'POOL_ID0_TREASURY',
+          poolTitle: 'กระเป๋ากลาง ID #0 (โบนัส 15 ชั้น)',
           direction: 'IN',
           amount: log.amount || 0.1,
           rank: log.details?.rank || 1,
           sourceNodeId: log.details?.fromNodeId || log.nodeId,
-          beneficiaryNodeId: log.nodeId,
+          beneficiaryNodeId: 0,
           actionType: 'LEVEL_BONUS_INFLOW',
           description: log.description,
           txHash: log.txHash || '0xlevel_bonus_inflow',
         });
-      } else if (log.type === 'LEVEL_BONUS' && (log.title.includes('ค่าชั้นส่วนที่เหลือ') || log.title.includes('🏛️'))) {
+      } else if (log.type === 'LEVEL_BONUS' && (log.title.includes('ค่าชั้นส่วนที่เหลือ') || log.title.includes('🏛️') || log.description.includes('กระเป๋ากลาง'))) {
         synthesized.push({
           id: log.id,
           timestamp: log.timestamp,
-          poolType: 'POOL_1_REBIRTH',
-          poolTitle: 'กองที่ 1: Rebirth Pool สำหรับโคลนนิ่ง',
+          poolType: 'POOL_ID0_TREASURY',
+          poolTitle: 'กระเป๋ากลาง ID #0 (ค่าชั้นส่วนที่เหลือ 15 ชั้น)',
           direction: 'IN',
           amount: log.amount || 0.1,
           rank: log.details?.rank || 1,
           sourceNodeId: log.nodeId,
-          beneficiaryNodeId: 1,
+          beneficiaryNodeId: 0,
           actionType: 'TREASURY_RESIDUAL_INFLOW',
           description: log.description,
           txHash: log.txHash || '0xtreasury_residual_inflow',
-        });
-      } else if (log.type === 'REGISTER' && log.title.includes('New Main ID')) {
-        synthesized.push({
-          id: log.id,
-          timestamp: log.timestamp,
-          poolType: 'POOL_2_EXCESS_VAULT_1_5',
-          poolTitle: 'กองที่ 2: กองกลาง สร้างจากส่วนเกิน 40% Vault (ผัง 1 ถึง 5)',
-          direction: 'OUT',
-          amount: log.amount || REGISTRATION_FEE,
-          rank: 1,
-          sourceNodeId: log.details?.mainId || log.nodeId,
-          beneficiaryNodeId: log.nodeId,
-          actionType: 'NEW_MAIN_ID_CREATED',
-          description: log.description,
-          txHash: log.txHash || '0xnew_main_id_created',
-        });
-      } else if (log.type === 'REGISTER' && log.title.includes('New Member')) {
-        synthesized.push({
-          id: log.id,
-          timestamp: log.timestamp,
-          poolType: 'POOL_3_EXCESS_VAULT_6_45',
-          poolTitle: 'กองที่ 3: กองกลาง สร้างจากส่วนเกิน 40% Vault (ผัง 6 ถึง 45)',
-          direction: 'OUT',
-          amount: log.amount || REGISTRATION_FEE,
-          rank: log.details?.rank || 1,
-          sourceNodeId: log.details?.creatorMainId || log.nodeId,
-          beneficiaryNodeId: log.nodeId,
-          actionType: 'NEW_MEMBER_CREATED',
-          description: log.description,
-          txHash: log.txHash || '0xnew_member_created',
         });
       }
     }
@@ -381,15 +323,7 @@ export class MatrixSimulator {
     });
   }
 
-  cancelScheduledAutoActions() {
-    if (this.autoTimerHandle) {
-      clearInterval(this.autoTimerHandle);
-      this.autoTimerHandle = null;
-    }
-    this.notifyCountdown(0, null, 0, 0);
-  }
-
-  // ดึงรายการงาน Auto ที่ค้างอยู่ เรียงลำดับจาก ID น้อยไปมาก (Ascending Order)
+  // ดึงรายการงานที่รอ Auto Actions ทั้งหมดตามลำดับความสำคัญ (Priority Order)
   getPendingAutoActionsList(): { type: 'rebirth_rank1' | 'rebirth_rank' | 'new_main_id_excess' | 'new_member_rank6'; nodeId: number; rank?: number; label: string }[] {
     const list: { type: 'rebirth_rank1' | 'rebirth_rank' | 'new_main_id_excess' | 'new_member_rank6'; nodeId: number; rank?: number; label: string }[] = [];
 
@@ -514,7 +448,18 @@ export class MatrixSimulator {
     this.notifyStateChanged();
   }
 
-  // สั่งรันรอบปัจจุบัน 1 รอบทันที (Execute Current Round Now)
+  cancelScheduledAutoActions() {
+    if (this.autoTimerHandle) {
+      clearInterval(this.autoTimerHandle);
+      this.autoTimerHandle = null;
+    }
+    this.activeAutoCountdown = 0;
+    this.activeAutoTaskType = null;
+    this.activeAutoCurrentRound = 0;
+    this.activeAutoTotalRounds = 0;
+    this.notifyCountdown(0, null, 0, 0);
+  }
+
   executeNextPendingAutoActionNow() {
     this.cancelScheduledAutoActions();
     this.executeSingleAutoActionStep();
@@ -542,6 +487,8 @@ export class MatrixSimulator {
     const nextTask = pendingList[0];
     const totalRounds = pendingList.length;
     const taskLabel = `${nextTask.label} [เหลืออีก ${totalRounds} รอบ]`;
+    this.activeAutoTaskType = taskLabel;
+    this.activeAutoTotalRounds = totalRounds;
 
     if (this.autoExecutionDelaySec <= 0) {
       this.cancelScheduledAutoActions();
@@ -549,24 +496,25 @@ export class MatrixSimulator {
       this.notifyStateChanged();
       const remainingList = this.getPendingAutoActionsList();
       if (remainingList.length > 0) {
-        setTimeout(() => this.scheduleAutoActions(), 20);
+        setTimeout(() => this.scheduleAutoActions(), 10);
       }
       return;
     }
 
     if (this.autoTimerHandle) {
-      clearInterval(this.autoTimerHandle);
-      this.autoTimerHandle = null;
+      this.notifyCountdown(this.activeAutoCountdown, taskLabel, 1, totalRounds);
+      return;
     }
 
-    let remaining = this.autoExecutionDelaySec;
-    this.notifyCountdown(remaining, taskLabel, 1, totalRounds);
+    this.activeAutoCountdown = this.autoExecutionDelaySec;
+    this.notifyCountdown(this.activeAutoCountdown, taskLabel, 1, totalRounds);
 
     this.autoTimerHandle = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
+      this.activeAutoCountdown -= 1;
+      if (this.activeAutoCountdown <= 0) {
         clearInterval(this.autoTimerHandle);
         this.autoTimerHandle = null;
+        this.activeAutoCountdown = 0;
         this.notifyCountdown(0, null, 0, 0);
 
         // ทำงาน 1 รอบ (1 รหัส)!
@@ -579,11 +527,10 @@ export class MatrixSimulator {
           this.scheduleAutoActions();
         }
       } else {
-        this.notifyCountdown(remaining, taskLabel, 1, totalRounds);
+        this.notifyCountdown(this.activeAutoCountdown, this.activeAutoTaskType, 1, this.activeAutoTotalRounds);
       }
     }, 1000);
   }
-
   runAutoActionsImmediately(targetMainId?: number) {
     this.executeAllPendingAutoActions();
   }
@@ -611,7 +558,7 @@ export class MatrixSimulator {
     this.nextNodeId = 2;
 
     this.rebirthPool = 0;
-    this.treasuryBalance = 5.0;
+    this.treasuryBalance = 0;
     this.isPaused = false;
     this.autoRebirthEnabled = true;
     this.autoExcessVaultNewMainIdEnabled = true;
@@ -628,8 +575,8 @@ export class MatrixSimulator {
       address: '0x0000000000000000000000000000000000000000',
       name: 'id0',
       nodeIds: [],
-      balance: 5.0,
-      totalEarned: 5.0,
+      balance: 0,
+      totalEarned: 0,
       rebirthCount: 0,
       pendingRebirths: 0,
       upgradeVault: 0,
@@ -699,50 +646,6 @@ export class MatrixSimulator {
       txHash: '0xgenesis...' + Math.random().toString(16).substring(2, 8),
       details: {
         sponsorId: 0,
-      }
-    });
-
-    // เพิ่มประวัติรหัส ID 0 (ได้รับค่าธรรมเนียม และโบนัสทั้งหมดของ Genesis Node #1 รวม 5.00 USDT)
-    this.addLog({
-      type: 'DIRECT_BONUS',
-      title: 'Direct Bonus Received: Node #0 (+1.50 USDT)',
-      description: 'ได้รับค่าแนะนำตรง 30% จำนวน 1.50 USDT จากการสถาปนารหัส Genesis Node #1',
-      nodeId: 0,
-      amount: 1.5,
-      txHash: '0xdirect_bonus_genesis_0',
-      details: {
-        rank: 1,
-        fromNodeId: 1,
-        amount: 1.5,
-      }
-    });
-
-    this.addLog({
-      type: 'LEVEL_BONUS',
-      title: 'Level Bonus Received: Node #0 (+1.50 USDT)',
-      description: 'ได้รับโบนัส 15 ชั้นส่วนที่เหลือ (จ่ายไม่ครบ 15 ชั้น) จำนวน 1.50 USDT จากการสถาปนารหัส Genesis Node #1',
-      nodeId: 0,
-      amount: 1.5,
-      txHash: '0xlevel_bonus_genesis_0',
-      details: {
-        rank: 1,
-        fromNodeId: 1,
-        depth: 15,
-        amount: 1.5,
-      }
-    });
-
-    this.addLog({
-      type: 'LEVEL_BONUS',
-      title: '🏛️ ส่วนแบ่ง Upgrade Vault ของ Genesis Node #1 โอนเข้ากระเป๋ากลาง (+2.00 USDT)',
-      description: 'ไม่มีอัพไลน์ชั้นบน (Parent Node #0) ส่วนแบ่ง Upgrade Vault 40% จำนวน 2.00 USDT โอนเข้ากระเป๋ากลาง (Treasury)',
-      nodeId: 0,
-      amount: 2.0,
-      txHash: '0xvault_genesis_residual',
-      details: {
-        rank: 1,
-        fromNodeId: 1,
-        amount: 2.0,
       }
     });
 
@@ -1904,11 +1807,19 @@ export class MatrixSimulator {
       (childNode.originalAncestorId === 1 || childNode.rebornFromNodeId === 1 || isChildWallet1)
     );
 
-    const directRecipientId = isCloneOf1 ? 1 : parentId;
+    let directRecipientId = parentId;
+    let redirectToTreasury = false;
+    if (isCloneOf1) {
+      directRecipientId = 0;
+      redirectToTreasury = true;
+    }
+
     const recipientNode = this.nodes.get(directRecipientId);
-    const recipientWallet = recipientNode
-      ? this.wallets.get(recipientNode.owner.toLowerCase())
-      : (isCloneOf1 ? this.wallets.get(INITIAL_WALLETS[0].address.toLowerCase()) : (parentWallet || this.wallets.get(parent.owner.toLowerCase())));
+    const recipientWallet = redirectToTreasury
+      ? this.wallets.get('0x0000000000000000000000000000000000000000')
+      : (recipientNode
+          ? this.wallets.get(recipientNode.owner.toLowerCase())
+          : (parentWallet || this.wallets.get(parent.owner.toLowerCase())));
 
     if (recipientWallet) {
       recipientWallet.balance = Math.round((recipientWallet.balance + DIRECT_BONUS) * 100) / 100;
@@ -1924,7 +1835,7 @@ export class MatrixSimulator {
       type: 'DIRECT_BONUS',
       title: `Direct Bonus Received: Node #${directRecipientId} (+${DIRECT_BONUS.toFixed(2)} USDT)`,
       description: isCloneOf1
-        ? `ได้รับค่าแนะนำตรง 30% จำนวน ${DIRECT_BONUS.toFixed(2)} USDT จากรหัสโคลนนิ่งของ #1 (รหัส #${childId}) ที่ไปต่อใต้ #${parentId}`
+        ? `ได้รับค่าแนะนำตรง 30% จำนวน ${DIRECT_BONUS.toFixed(2)} USDT จากรหัสโคลนนิ่งของ #1 (รหัส #${childId}) ที่ไปต่อใต้ #${parentId} [ส่งมอบเข้ากระเป๋ากลาง ID 0 แทน ID 1]`
         : `ได้รับค่าแนะนำตรง 30% จำนวน ${DIRECT_BONUS.toFixed(2)} USDT จากรหัส #${childId} (ผัง 1)`,
       nodeId: directRecipientId,
       amount: DIRECT_BONUS,
@@ -1935,6 +1846,7 @@ export class MatrixSimulator {
         amount: DIRECT_BONUS,
         isCloneOf1,
         parentId,
+        redirectToTreasury,
       }
     });
 
@@ -2004,8 +1916,8 @@ export class MatrixSimulator {
     this.addLog({
       type: 'PAYOUT_LEFT',
       title: `100% Left Child Math Executed (5.0 USDT)`,
-      description: isCloneOf1
-        ? `30% Direct Upline (${DIRECT_BONUS} USDT) -> ส่งกลับไปให้รหัส #1 (${recipientWallet?.name || 'id1'}) [เนื่องจาก #${childId} เป็นโคลนนิ่งของ #1], 40% Upgrade Vault (${UPGRADE_VAULT_SHARE} USDT) -> รหัส #${parentId}, 30% โบนัส 15 ชั้นเริ่มตั้งแต่ชั้นที่ 0 (${distributedLevels} ชั้น * 0.1 USDT)${distributedLevels < MAX_LEVELS ? `, ค่าชั้นส่วนที่เหลือ ${((MAX_LEVELS - distributedLevels) * LEVEL_BONUS).toFixed(2)} USDT โอนเข้ากระเป๋ากลาง Treasury` : ''}`
+      description: redirectToTreasury
+        ? `30% Direct Upline (${DIRECT_BONUS} USDT) -> โอนเข้ากระเป๋ากลาง (${recipientWallet?.name || 'id0'}) [เนื่องจากเป็นสิทธิ์ของรหัส #1 / โคลนนิ่งของ #1], 40% Upgrade Vault (${UPGRADE_VAULT_SHARE} USDT) -> รหัส #${parentId}, 30% โบนัส 15 ชั้นเริ่มตั้งแต่ชั้นที่ 0 (${distributedLevels} ชั้น * 0.1 USDT)${distributedLevels < MAX_LEVELS ? `, ค่าชั้นส่วนที่เหลือ ${((MAX_LEVELS - distributedLevels) * LEVEL_BONUS).toFixed(2)} USDT โอนเข้ากระเป๋ากลาง Treasury` : ''}`
         : `30% Direct Upline (${DIRECT_BONUS} USDT) -> รหัส #${parentId} (${parentWallet?.name || `Node #${parentId}`}), 40% Upgrade Vault (${UPGRADE_VAULT_SHARE} USDT) -> รหัส #${parentId}, 30% โบนัส 15 ชั้นเริ่มตั้งแต่ชั้นที่ 0 (${distributedLevels} ชั้น * 0.1 USDT)${distributedLevels < MAX_LEVELS ? `, ค่าชั้นส่วนที่เหลือ ${((MAX_LEVELS - distributedLevels) * LEVEL_BONUS).toFixed(2)} USDT โอนเข้ากระเป๋ากลาง Treasury` : ''}`,
       nodeId: childId,
       parentId,
@@ -2017,8 +1929,8 @@ export class MatrixSimulator {
         parentId,
         directBonus: {
           sponsorNodeId: directRecipientId,
-          sponsorAddress: recipientWallet?.address || (isCloneOf1 ? INITIAL_WALLETS[0].address.toLowerCase() : parent.owner.toLowerCase()),
-          sponsorName: recipientWallet?.name || (isCloneOf1 ? 'id1' : (parentWallet?.name || `Node #${parentId}`)),
+          sponsorAddress: recipientWallet?.address || (redirectToTreasury ? '0x0000000000000000000000000000000000000000' : parent.owner.toLowerCase()),
+          sponsorName: recipientWallet?.name || (redirectToTreasury ? 'id0' : (parentWallet?.name || `Node #${parentId}`)),
           amount: DIRECT_BONUS,
         },
         levelBonus: {
@@ -2481,6 +2393,8 @@ export class MatrixSimulator {
       amount,
       txHash: '0xtest_vault_rank1_5_' + Date.now().toString(16),
     });
+    this.notifyStateChanged();
+    this.scheduleAutoActions();
   }
 
   // 3. หักยอดส่วนเกิน 40% Upgrade Vault (ตัดออกจากโหนดหรือผังที่อยู่นอกระยะ 5 ผังก่อน หรือผังเก่า)
@@ -2825,6 +2739,8 @@ export class MatrixSimulator {
       },
     });
 
+    this.notifyStateChanged();
+    this.scheduleAutoActions();
     return newMainNodeId;
   }
 
@@ -3298,6 +3214,8 @@ export class MatrixSimulator {
       amount,
       txHash: '0xtest_vault_rank6_' + Date.now().toString(16),
     });
+    this.notifyStateChanged();
+    this.scheduleAutoActions();
   }
 
   // 4. บอทสแกนระบบสำหรับสร้าง ID ใหม่จากส่วนเกิน 40% Vault อัตโนมัติ

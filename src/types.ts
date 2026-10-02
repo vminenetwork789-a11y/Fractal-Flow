@@ -190,7 +190,7 @@ export interface ExcessRebirthVaultSummary {
   formulaText: string;
 }
 
-export type CentralPoolType = 'POOL_1_REBIRTH' | 'POOL_2_EXCESS_VAULT_1_5' | 'POOL_3_EXCESS_VAULT_6_45';
+export type CentralPoolType = 'POOL_ID0_TREASURY' | 'POOL_2_EXCESS_VAULT_1_5' | 'POOL_3_EXCESS_VAULT_6_45';
 
 export type CentralPoolActionType = 
   | 'RIGHT_CHILD_INFLOW'       // ลูกขวาเข้าผัง 100% เข้ากองกลาง
